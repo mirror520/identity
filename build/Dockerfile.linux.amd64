@@ -1,0 +1,4 @@
+FROM alpine:3.15
+EXPOSE 8080
+ADD release/linux/amd64/cloud-api /bin/
+ENTRYPOINT ["/bin/cloud-api"] 
