@@ -9,8 +9,8 @@ import (
 
 	"github.com/mirror520/identity"
 	"github.com/mirror520/identity/conf"
-	"github.com/mirror520/identity/gateway/http"
 	"github.com/mirror520/identity/persistent/db"
+	"github.com/mirror520/identity/transport/http"
 )
 
 func main() {
@@ -36,8 +36,8 @@ func main() {
 	var authenticator http.Authenticator
 	{
 		svc := identity.NewService(repo, cfg.Providers)
-		endpint := identity.SignInEndpoint(svc)
-		authenticator = identity.Authenticator(endpint)
+		endpoint := identity.SignInEndpoint(svc)
+		authenticator = http.SignInAuthenticator(endpoint)
 	}
 
 	authMiddleware, err := http.AuthMiddlware(authenticator, *cfg)
@@ -49,7 +49,10 @@ func main() {
 	r := gin.Default()
 	r.Use(cors.Default())
 
-	http.SetRouter(r, authMiddleware)
+	apiV1 := r.Group("/v1")
+	{
+		apiV1.PATCH("/login", authMiddleware.LoginHandler)
+	}
 
 	r.Run(":8080")
 }

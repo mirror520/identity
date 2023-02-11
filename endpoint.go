@@ -2,6 +2,7 @@ package identity
 
 import (
 	"context"
+	"errors"
 
 	"github.com/go-kit/kit/endpoint"
 
@@ -15,7 +16,11 @@ type SignInRequest struct {
 
 func SignInEndpoint(svc Service) endpoint.Endpoint {
 	return func(ctx context.Context, request any) (response any, err error) {
-		req := request.(SignInRequest)
+		req, ok := request.(SignInRequest)
+		if !ok {
+			return nil, errors.New("invalid request")
+		}
+
 		user, err := svc.SignIn(req.Credential, req.Provider)
 		if err != nil {
 			return nil, err

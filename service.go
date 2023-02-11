@@ -86,13 +86,6 @@ func (svc *service) signInWithGoogle(token string) (*user.User, error) {
 		if err != nil {
 			return nil, err
 		}
-
-		// Default Workspace
-		w := u.DefaultWorkspace()
-		err = svc.users.StoreWorkspace(w)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	picture, ok := payload.Claims["picture"].(string)

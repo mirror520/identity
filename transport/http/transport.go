@@ -1,4 +1,4 @@
-package identity
+package http
 
 import (
 	"net/http"
@@ -6,15 +6,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-kit/kit/endpoint"
 
+	"github.com/mirror520/identity"
 	"github.com/mirror520/identity/model"
 	"github.com/mirror520/identity/model/user"
-
-	middleware "github.com/mirror520/identity/gateway/http"
 )
 
 func SignInHandler(endpoint endpoint.Endpoint) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var req SignInRequest
+		var req identity.SignInRequest
 		err := ctx.ShouldBind(&req)
 		if err != nil {
 			result := model.FailureResult(err)
@@ -35,9 +34,9 @@ func SignInHandler(endpoint endpoint.Endpoint) gin.HandlerFunc {
 	}
 }
 
-func Authenticator(endpoint endpoint.Endpoint) middleware.Authenticator {
+func SignInAuthenticator(endpoint endpoint.Endpoint) Authenticator {
 	return func(ctx *gin.Context) (any, error) {
-		var req SignInRequest
+		var req identity.SignInRequest
 		if err := ctx.ShouldBind(&req); err != nil {
 			return nil, err
 		}
@@ -49,7 +48,7 @@ func Authenticator(endpoint endpoint.Endpoint) middleware.Authenticator {
 
 		user, ok := resp.(*user.User)
 		if !ok {
-			return nil, middleware.ErrFailedAuthentication
+			return nil, ErrFailedAuthentication
 		}
 
 		ctx.Set("user", user)

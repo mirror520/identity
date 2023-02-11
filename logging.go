@@ -7,13 +7,14 @@ import (
 )
 
 func LoggingMiddleware() ServiceMiddleware {
-	log := zap.L().With(
-		zap.String("service", "identity"),
-		zap.String("middleware", "logging"),
-	)
-
 	return func(next Service) Service {
-		return &loggingMiddleware{log, next}
+		return &loggingMiddleware{
+			zap.L().With(
+				zap.String("service", "identity"),
+				zap.String("middleware", "logging"),
+			),
+			next,
+		}
 	}
 }
 
@@ -33,5 +34,8 @@ func (mw *loggingMiddleware) SignIn(credential string, provider user.SocialProvi
 		return nil, err
 	}
 
+	log.Info("user signin",
+		zap.String("username", u.Username),
+	)
 	return u, nil
 }
