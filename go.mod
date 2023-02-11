@@ -1,4 +1,4 @@
-module github.com/mirror520/jinte
+module github.com/mirror520/identity
 
 go 1.19
 

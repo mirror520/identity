@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/mirror520/jinte/model"
+	"github.com/mirror520/identity/model"
 )
 
 var (

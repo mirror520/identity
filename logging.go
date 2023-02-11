@@ -3,10 +3,10 @@ package identity
 import (
 	"go.uber.org/zap"
 
-	"github.com/mirror520/jinte/model/user"
+	"github.com/mirror520/identity/model/user"
 )
 
-func NewLoggingMiddleware() IdentityMiddleware {
+func LoggingMiddleware() ServiceMiddleware {
 	log := zap.L().With(
 		zap.String("service", "identity"),
 		zap.String("middleware", "logging"),

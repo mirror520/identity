@@ -1,6 +1,6 @@
 package user
 
-import "github.com/mirror520/jinte/model"
+import "github.com/mirror520/identity/model"
 
 type WorkspaceID uint
 

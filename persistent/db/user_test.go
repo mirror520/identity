@@ -6,8 +6,8 @@ import (
 	"github.com/jinzhu/configor"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/mirror520/jinte/model"
-	"github.com/mirror520/jinte/model/user"
+	"github.com/mirror520/identity/model"
+	"github.com/mirror520/identity/model/user"
 )
 
 type userRepositoryTestSuite struct {

@@ -1,19 +1,27 @@
-package identity
+package main
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/jinzhu/configor"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/mirror520/jinte/model"
-	"github.com/mirror520/jinte/model/user"
-	"github.com/mirror520/jinte/persistent/db"
+	"github.com/mirror520/identity"
+	"github.com/mirror520/identity/model"
+	"github.com/mirror520/identity/model/user"
+	"github.com/mirror520/identity/persistent/db"
 )
+
+func TestLoadConfig(t *testing.T) {
+	configor.Load(&model.Config, "config.example.yaml")
+	config := model.Config
+	fmt.Println(config)
+}
 
 type identityTestSuite struct {
 	suite.Suite
-	svc   Service
+	svc   identity.Service
 	users user.Repository
 	token string
 }
@@ -30,7 +38,7 @@ func (suite *identityTestSuite) SetupTest() {
 		return
 	}
 
-	suite.svc = NewService(users)
+	suite.svc = identity.NewService(users)
 	suite.users = users
 }
 

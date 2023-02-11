@@ -7,8 +7,8 @@ import (
 
 	"google.golang.org/api/idtoken"
 
-	"github.com/mirror520/jinte/model"
-	"github.com/mirror520/jinte/model/user"
+	"github.com/mirror520/identity/model"
+	"github.com/mirror520/identity/model/user"
 )
 
 var (
@@ -19,11 +19,11 @@ var (
 	ErrPictureNotFound      = errors.New("picture not found")
 )
 
-type IdentityMiddleware func(Service) Service
-
 type Service interface {
 	SignIn(credential string, provider user.SocialProvider) (*user.User, error)
 }
+
+type ServiceMiddleware func(Service) Service
 
 type service struct {
 	users     user.Repository

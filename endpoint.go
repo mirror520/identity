@@ -3,8 +3,8 @@ package identity
 import (
 	"context"
 
-	"github.com/mirror520/jinte/gateway"
-	"github.com/mirror520/jinte/model/user"
+	"github.com/mirror520/identity/gateway"
+	"github.com/mirror520/identity/model/user"
 )
 
 type SignInRequest struct {

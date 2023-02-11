@@ -8,10 +8,10 @@ import (
 	"github.com/jinzhu/configor"
 	"go.uber.org/zap"
 
-	"github.com/mirror520/jinte/gateway/http"
-	"github.com/mirror520/jinte/model"
-	"github.com/mirror520/jinte/persistent/db"
-	"github.com/mirror520/jinte/service/identity"
+	"github.com/mirror520/identity"
+	"github.com/mirror520/identity/gateway/http"
+	"github.com/mirror520/identity/model"
+	"github.com/mirror520/identity/persistent/db"
 )
 
 func main() {
@@ -26,7 +26,7 @@ func main() {
 
 	zap.ReplaceGlobals(log)
 
-	users, err := db.NewUserRepository()
+	repo, err := db.NewUserRepository()
 	if err != nil {
 		log.Fatal(err.Error())
 		return
@@ -34,7 +34,7 @@ func main() {
 
 	var authenticator http.Authenticator
 	{
-		svc := identity.NewService(users)
+		svc := identity.NewService(repo)
 		endpint := identity.SignInEndpoint(svc)
 		authenticator = identity.Authenticator(endpint)
 	}

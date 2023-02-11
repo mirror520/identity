@@ -5,11 +5,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/mirror520/jinte/gateway"
-	"github.com/mirror520/jinte/model"
-	"github.com/mirror520/jinte/model/user"
+	"github.com/mirror520/identity/gateway"
+	"github.com/mirror520/identity/model"
+	"github.com/mirror520/identity/model/user"
 
-	middleware "github.com/mirror520/jinte/gateway/http"
+	middleware "github.com/mirror520/identity/gateway/http"
 )
 
 func SignInHandler(endpoint gateway.Endpoint) gin.HandlerFunc {
