@@ -1,22 +1,23 @@
 package main
 
 import (
-	"os"
+	"log"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/jinzhu/configor"
 	"go.uber.org/zap"
 
 	"github.com/mirror520/identity"
+	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/gateway/http"
-	"github.com/mirror520/identity/model"
 	"github.com/mirror520/identity/persistent/db"
 )
 
 func main() {
-	os.Setenv("CONFIGOR_ENV_PREFIX", "JINTE")
-	configor.Load(&model.Config, "config.yaml")
+	cfg, err := conf.LoadConfig(".")
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 
 	log, err := zap.NewDevelopment()
 	if err != nil {
@@ -26,7 +27,7 @@ func main() {
 
 	zap.ReplaceGlobals(log)
 
-	repo, err := db.NewUserRepository()
+	repo, err := db.NewUserRepository(cfg.DB)
 	if err != nil {
 		log.Fatal(err.Error())
 		return
@@ -34,12 +35,12 @@ func main() {
 
 	var authenticator http.Authenticator
 	{
-		svc := identity.NewService(repo)
+		svc := identity.NewService(repo, cfg.Providers)
 		endpint := identity.SignInEndpoint(svc)
 		authenticator = identity.Authenticator(endpint)
 	}
 
-	authMiddleware, err := http.AuthMiddlware(authenticator)
+	authMiddleware, err := http.AuthMiddlware(authenticator, *cfg)
 	if err != nil {
 		log.Fatal(err.Error())
 		return

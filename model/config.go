@@ -14,37 +14,24 @@ const (
 	PostgreSQL DBDriver = "postgresql"
 )
 
-var Config = struct {
-	BaseURL string
-
-	JWT JWTConfig
-
-	DB struct {
-		Driver   DBDriver
-		Host     string
-		Port     int
-		Username string
-		Password string
-		DBName   string
-	}
-
-	Redis RedisConfig
-
-	Google struct {
-		Client struct {
-			ID     string
-			Secret string
-		}
-	}
-
-	Services struct {
+type Config struct {
+	BaseURL   string
+	DB        DB
+	JWT       JWTConfig
+	Redis     RedisConfig
+	Providers Providers
+	Services  struct {
 		Edge EdgeConfig
 	}
-}{}
+}
 
-type EdgeConfig struct {
-	OTP OTPConfig
-	JWT JWTConfig
+type DB struct {
+	Driver   DBDriver
+	Host     string
+	Port     int
+	Username string
+	Password string
+	DBName   string
 }
 
 type JWTConfig struct {
@@ -99,12 +86,26 @@ type RedisConfig struct {
 	DB       int
 }
 
+type Providers struct {
+	Google struct {
+		Client struct {
+			ID     string
+			Secret string
+		}
+	}
+}
+
 func (cfg *RedisConfig) Addr() string {
 	port := cfg.Port
 	if port == 0 {
 		port = 6379
 	}
 	return cfg.Host + ":" + strconv.Itoa(port)
+}
+
+type EdgeConfig struct {
+	OTP OTPConfig
+	JWT JWTConfig
 }
 
 type OTPConfig struct {

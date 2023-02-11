@@ -1,23 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/jinzhu/configor"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/mirror520/identity"
-	"github.com/mirror520/identity/model"
+	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/model/user"
 	"github.com/mirror520/identity/persistent/db"
 )
-
-func TestLoadConfig(t *testing.T) {
-	configor.Load(&model.Config, "config.example.yaml")
-	config := model.Config
-	fmt.Println(config)
-}
 
 type identityTestSuite struct {
 	suite.Suite
@@ -27,18 +19,21 @@ type identityTestSuite struct {
 }
 
 func (suite *identityTestSuite) SetupSuite() {
-	configor.Load(&model.Config, "../../config.yaml")
-	suite.token = "YOUR GOOGLE JWT TOKEN" // Token 需由 Google 簽發
-}
-
-func (suite *identityTestSuite) SetupTest() {
-	users, err := db.NewUserRepository()
+	cfg, err := conf.LoadConfig("../..")
 	if err != nil {
 		suite.Fail(err.Error())
 		return
 	}
 
-	suite.svc = identity.NewService(users)
+	suite.token = "YOUR GOOGLE JWT TOKEN" // Token 需由 Google 簽發
+
+	users, err := db.NewUserRepository(cfg.DB)
+	if err != nil {
+		suite.Fail(err.Error())
+		return
+	}
+
+	suite.svc = identity.NewService(users, cfg.Providers)
 	suite.users = users
 }
 

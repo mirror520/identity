@@ -15,10 +15,9 @@ type userRepository struct {
 	db *gorm.DB
 }
 
-func NewUserRepository() (user.Repository, error) {
-	cfg := model.Config
+func NewUserRepository(cfg model.DB) (user.Repository, error) {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		cfg.DB.Username, cfg.DB.Password, cfg.DB.Host, cfg.DB.Port, cfg.DB.DBName,
+		cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.DBName,
 	)
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})

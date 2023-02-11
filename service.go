@@ -30,11 +30,11 @@ type service struct {
 	clientIDs map[user.SocialProvider]string
 }
 
-func NewService(users user.Repository) Service {
+func NewService(users user.Repository, cfg model.Providers) Service {
 	svc := new(service)
 	svc.users = users
 	svc.clientIDs = map[user.SocialProvider]string{
-		user.GOOGLE: model.Config.Google.Client.ID,
+		user.GOOGLE: cfg.Google.Client.ID,
 	}
 	return svc
 }

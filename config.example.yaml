@@ -21,10 +21,11 @@ redis:
   password: 
   db: 0
 
-google:
-  client: 
-    id: google_client_id
-    secret: google_client_secret
+providers:
+  google:
+    client: 
+      id: google_client_id
+      secret: google_client_secret
 
 services:
   edge:

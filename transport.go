@@ -4,15 +4,15 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-kit/kit/endpoint"
 
-	"github.com/mirror520/identity/gateway"
 	"github.com/mirror520/identity/model"
 	"github.com/mirror520/identity/model/user"
 
 	middleware "github.com/mirror520/identity/gateway/http"
 )
 
-func SignInHandler(endpoint gateway.Endpoint) gin.HandlerFunc {
+func SignInHandler(endpoint endpoint.Endpoint) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var req SignInRequest
 		err := ctx.ShouldBind(&req)
@@ -35,7 +35,7 @@ func SignInHandler(endpoint gateway.Endpoint) gin.HandlerFunc {
 	}
 }
 
-func Authenticator(endpoint gateway.Endpoint) middleware.Authenticator {
+func Authenticator(endpoint endpoint.Endpoint) middleware.Authenticator {
 	return func(ctx *gin.Context) (any, error) {
 		var req SignInRequest
 		if err := ctx.ShouldBind(&req); err != nil {

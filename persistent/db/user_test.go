@@ -3,10 +3,9 @@ package db
 import (
 	"testing"
 
-	"github.com/jinzhu/configor"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/mirror520/identity/model"
+	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/model/user"
 )
 
@@ -17,11 +16,13 @@ type userRepositoryTestSuite struct {
 }
 
 func (suite *userRepositoryTestSuite) SetupSuite() {
-	configor.Load(&model.Config, "../../config.yaml")
-}
+	cfg, err := conf.LoadConfig("../..")
+	if err != nil {
+		suite.Fail(err.Error())
+		return
+	}
 
-func (suite *userRepositoryTestSuite) SetupTest() {
-	users, err := NewUserRepository()
+	users, err := NewUserRepository(cfg.DB)
 	if err != nil {
 		suite.Fail(err.Error())
 		return

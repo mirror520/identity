@@ -19,8 +19,7 @@ var (
 
 type Authenticator func(*gin.Context) (any, error)
 
-func AuthMiddlware(authenticator Authenticator) (*jwt.GinJWTMiddleware, error) {
-	cfg := model.Config
+func AuthMiddlware(authenticator Authenticator, cfg model.Config) (*jwt.GinJWTMiddleware, error) {
 	identityKey := "username"
 
 	mw := &jwt.GinJWTMiddleware{
