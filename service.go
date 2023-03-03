@@ -20,7 +20,14 @@ var (
 )
 
 type Service interface {
+	Register(username string, name string, email string) (*user.User, error)
+	OTPVerify(otp string, id user.UserID) (*user.User, error)
 	SignIn(credential string, provider user.SocialProvider) (*user.User, error)
+	AddSocialAccount(credential string, provider user.SocialProvider, id user.UserID) (*user.User, error)
+
+	UserRegisteredHandler(e *user.UserRegisteredEvent) error
+	UserActivatedHandler(e *user.UserActivatedEvent) error
+	UserSocialAccountAddedHandler(e *user.UserSocialAccountAddedEvent) error
 }
 
 type ServiceMiddleware func(Service) Service
@@ -37,6 +44,28 @@ func NewService(users user.Repository, cfg model.Providers) Service {
 		user.GOOGLE: cfg.Google.Client.ID,
 	}
 	return svc
+}
+
+func (svc *service) Register(username string, name string, email string) (*user.User, error) {
+	_, err := svc.users.FindByUsername(username)
+	if err == nil {
+		return nil, errors.New("user exists")
+	}
+
+	u := user.NewUser(username, name, email)
+	return u, nil
+}
+
+func (svc *service) OTPVerify(otp string, id user.UserID) (*user.User, error) {
+	u, err := svc.users.Find(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: otp verify
+	u.Activate()
+
+	return u, nil
 }
 
 func (svc *service) SignIn(credential string, provider user.SocialProvider) (*user.User, error) {
@@ -59,7 +88,7 @@ func (svc *service) signInWithGoogle(token string) (*user.User, error) {
 		return nil, err
 	}
 
-	socialID := user.SocialAccountID(payload.Subject)
+	socialID := payload.Subject
 	u, err := svc.users.FindBySocialID(socialID)
 	if err != nil {
 		if !errors.Is(err, user.ErrUserNotFound) {
@@ -81,8 +110,9 @@ func (svc *service) signInWithGoogle(token string) (*user.User, error) {
 
 		u = user.NewUser(username, name, email)
 		u.AddSocialAccount(user.GOOGLE, socialID)
+		u.Activate()
 
-		err := svc.users.Store(u) // Create User
+		err := svc.users.Store(u)
 		if err != nil {
 			return nil, err
 		}
@@ -95,4 +125,54 @@ func (svc *service) signInWithGoogle(token string) (*user.User, error) {
 
 	u.Avatar = picture
 	return u, nil
+}
+
+func (svc *service) AddSocialAccount(credential string, provider user.SocialProvider, id user.UserID) (*user.User, error) {
+	u, err := svc.users.Find(id)
+	if err != nil {
+		return nil, err
+	}
+
+	clientID, ok := svc.clientIDs[user.GOOGLE]
+	if !ok {
+		return nil, ErrClientIDNotFound
+	}
+
+	payload, err := idtoken.Validate(context.Background(), credential, clientID)
+	if err != nil {
+		return nil, err
+	}
+
+	socialID := payload.Subject
+	_, err = svc.users.FindBySocialID(socialID)
+	if err == nil {
+		return nil, errors.New("account exists")
+	}
+
+	u.AddSocialAccount(provider, socialID)
+	return u, nil
+}
+
+func (svc *service) UserRegisteredHandler(e *user.UserRegisteredEvent) error {
+	return svc.users.Store(e.User)
+}
+
+func (svc *service) UserActivatedHandler(e *user.UserActivatedEvent) error {
+	u, err := svc.users.Find(e.UserID)
+	if err != nil {
+		return err
+	}
+
+	u.Status = e.Status
+	return svc.users.Store(u)
+}
+
+func (svc *service) UserSocialAccountAddedHandler(e *user.UserSocialAccountAddedEvent) error {
+	u, err := svc.users.Find(e.UserID)
+	if err != nil {
+		return err
+	}
+
+	u.Accounts = append(u.Accounts, e.SocialAccount)
+	return svc.users.Store(u)
 }

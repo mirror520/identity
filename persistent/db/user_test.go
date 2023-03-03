@@ -32,24 +32,12 @@ func (suite *userRepositoryTestSuite) SetupSuite() {
 	u.AddSocialAccount(user.GOOGLE, "100043685676652067799")
 	users.Store(u)
 
-	w := u.DefaultWorkspace()
-	w.Name = "Mirror's Workspace"
-	users.StoreWorkspace(w)
-
-	w1 := u.BuildWorkspace("First Workspace")
-	w2 := u.BuildWorkspace("Second Workspace")
-	w3 := u.BuildWorkspace("Third Workspace")
-
-	users.StoreWorkspace(w1)
-	users.StoreWorkspace(w2)
-	users.StoreWorkspace(w3)
-
 	suite.users = users
 	suite.user = u
 }
 
 func (suite *userRepositoryTestSuite) TestFindBySocialID() {
-	sid := user.SocialAccountID("100043685676652067799")
+	sid := "100043685676652067799"
 
 	user, err := suite.users.FindBySocialID(sid)
 	if err != nil {
@@ -61,20 +49,8 @@ func (suite *userRepositoryTestSuite) TestFindBySocialID() {
 	suite.Equal(sid, user.Accounts[0].SocialID)
 }
 
-func (suite *userRepositoryTestSuite) TestFindWorkspaces() {
-	workspaces, err := suite.users.FindWorkspaces(suite.user.ID)
-	if err != nil {
-		suite.Fail(err.Error())
-		return
-	}
-
-	suite.Len(workspaces, 4)
-}
-
 func (suite *userRepositoryTestSuite) TearDownTest() {
 	db := suite.users.(DBPersistent).DB()
-	db.Exec("DROP TABLE workspace_members")
-	db.Exec("DROP TABLE workspaces")
 	db.Exec("DROP TABLE social_accounts")
 	db.Exec("DROP TABLE users")
 }

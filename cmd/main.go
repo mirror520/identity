@@ -9,7 +9,7 @@ import (
 
 	"github.com/mirror520/identity"
 	"github.com/mirror520/identity/conf"
-	"github.com/mirror520/identity/persistent/db"
+	"github.com/mirror520/identity/persistent/inmem"
 	"github.com/mirror520/identity/transport/http"
 )
 
@@ -27,7 +27,7 @@ func main() {
 
 	zap.ReplaceGlobals(log)
 
-	repo, err := db.NewUserRepository(cfg.DB)
+	repo, err := inmem.NewUserRepository()
 	if err != nil {
 		log.Fatal(err.Error())
 		return
@@ -49,10 +49,7 @@ func main() {
 	r := gin.Default()
 	r.Use(cors.Default())
 
-	apiV1 := r.Group("/v1")
-	{
-		apiV1.PATCH("/login", authMiddleware.LoginHandler)
-	}
+	r.PATCH("/login", authMiddleware.LoginHandler)
 
 	r.Run(":8080")
 }

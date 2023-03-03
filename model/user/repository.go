@@ -1,11 +1,11 @@
 package user
 
 type Repository interface {
-	// User operations
+	// Command
 	Store(u *User) error
-	FindBySocialID(id SocialAccountID) (*User, error)
 
-	// Workspace operations
-	StoreWorkspace(w *Workspace) error
-	FindWorkspaces(id UserID) ([]*WorkspaceMember, error)
+	// Query
+	Find(id UserID) (*User, error)
+	FindByUsername(username string) (*User, error)
+	FindBySocialID(socialID string) (*User, error)
 }

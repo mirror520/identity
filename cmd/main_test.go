@@ -46,7 +46,7 @@ func (suite *identityTestSuite) TestSignInWithGoogle() {
 	}
 
 	suite.Equal("mirror770109", u.Username)
-	suite.Equal(user.SocialAccountID("100043685676652067799"), u.Accounts[0].SocialID)
+	suite.Equal("100043685676652067799", u.Accounts[0].SocialID)
 }
 
 func (suite *identityTestSuite) TearDownTest() {
