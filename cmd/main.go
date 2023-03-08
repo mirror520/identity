@@ -2,19 +2,25 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
 	"github.com/mirror520/identity"
-	"github.com/mirror520/identity/conf"
-	"github.com/mirror520/identity/persistent/inmem"
+	"github.com/mirror520/identity/model/conf"
+	"github.com/mirror520/identity/persistent"
 	"github.com/mirror520/identity/transport/http"
 )
 
 func main() {
-	cfg, err := conf.LoadConfig(".")
+	path, ok := os.LookupEnv("IDENTITY_PATH")
+	if !ok {
+		path = "."
+	}
+
+	cfg, err := conf.LoadConfig(path)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -27,7 +33,7 @@ func main() {
 
 	zap.ReplaceGlobals(log)
 
-	repo, err := inmem.NewUserRepository()
+	repo, err := persistent.NewUserRepository(cfg.Persistent)
 	if err != nil {
 		log.Fatal(err.Error())
 		return
@@ -36,6 +42,7 @@ func main() {
 	var authenticator http.Authenticator
 	{
 		svc := identity.NewService(repo, cfg.Providers)
+		svc = identity.LoggingMiddleware(log)(svc)
 		endpoint := identity.SignInEndpoint(svc)
 		authenticator = http.SignInAuthenticator(endpoint)
 	}

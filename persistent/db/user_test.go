@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/mirror520/identity/conf"
+	"github.com/mirror520/identity/model/conf"
 	"github.com/mirror520/identity/model/user"
 )
 
@@ -22,7 +22,7 @@ func (suite *userRepositoryTestSuite) SetupSuite() {
 		return
 	}
 
-	users, err := NewUserRepository(cfg.DB)
+	users, err := NewUserRepository(cfg.Persistent)
 	if err != nil {
 		suite.Fail(err.Error())
 		return

@@ -10,6 +10,7 @@ import (
 	jwt "github.com/appleboy/gin-jwt/v2"
 
 	"github.com/mirror520/identity/model"
+	"github.com/mirror520/identity/model/conf"
 	"github.com/mirror520/identity/model/user"
 )
 
@@ -19,7 +20,7 @@ var (
 
 type Authenticator func(*gin.Context) (any, error)
 
-func AuthMiddlware(authenticator Authenticator, cfg model.Config) (*jwt.GinJWTMiddleware, error) {
+func AuthMiddlware(authenticator Authenticator, cfg conf.Config) (*jwt.GinJWTMiddleware, error) {
 	identityKey := "username"
 
 	mw := &jwt.GinJWTMiddleware{

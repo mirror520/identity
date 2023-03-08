@@ -29,6 +29,10 @@ func NewID() UserID {
 	return UserID(ulid.Make())
 }
 
+func (id UserID) Bytes() []byte {
+	return id[:]
+}
+
 func (id UserID) String() string {
 	return ulid.ULID(id).String()
 }

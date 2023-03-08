@@ -6,7 +6,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/mirror520/identity/model"
+	"github.com/mirror520/identity/model/conf"
 	"github.com/mirror520/identity/model/user"
 )
 
@@ -14,8 +14,8 @@ type userRepository struct {
 	db *gorm.DB
 }
 
-func NewUserRepository(cfg model.DB) (user.Repository, error) {
-	db, err := gorm.Open(sqlite.Open(""), &gorm.Config{})
+func NewUserRepository(cfg conf.DB) (user.Repository, error) {
+	db, err := gorm.Open(sqlite.Open(cfg.Name+".sql"), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package events
 import "sync"
 
 type DomainEvent interface {
+	EventName() string
 }
 
 type EventStore interface {

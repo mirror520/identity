@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/mirror520/identity"
-	"github.com/mirror520/identity/conf"
+	"github.com/mirror520/identity/model/conf"
 	"github.com/mirror520/identity/model/user"
-	"github.com/mirror520/identity/persistent/db"
+	"github.com/mirror520/identity/persistent/inmem"
 )
 
 type identityTestSuite struct {
@@ -27,7 +27,7 @@ func (suite *identityTestSuite) SetupSuite() {
 
 	suite.token = "YOUR GOOGLE JWT TOKEN" // Token 需由 Google 簽發
 
-	users, err := db.NewUserRepository(cfg.DB)
+	users, err := inmem.NewUserRepository()
 	if err != nil {
 		suite.Fail(err.Error())
 		return
@@ -47,14 +47,6 @@ func (suite *identityTestSuite) TestSignInWithGoogle() {
 
 	suite.Equal("mirror770109", u.Username)
 	suite.Equal("100043685676652067799", u.Accounts[0].SocialID)
-}
-
-func (suite *identityTestSuite) TearDownTest() {
-	db := suite.users.(db.DBPersistent).DB()
-	db.Exec("DROP TABLE workspace_members")
-	db.Exec("DROP TABLE workspaces")
-	db.Exec("DROP TABLE social_accounts")
-	db.Exec("DROP TABLE users")
 }
 
 func TestIdentityTestSuite(t *testing.T) {

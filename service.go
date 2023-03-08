@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/api/idtoken"
 
-	"github.com/mirror520/identity/model"
+	"github.com/mirror520/identity/model/conf"
 	"github.com/mirror520/identity/model/user"
 )
 
@@ -37,7 +37,7 @@ type service struct {
 	clientIDs map[user.SocialProvider]string
 }
 
-func NewService(users user.Repository, cfg model.Providers) Service {
+func NewService(users user.Repository, cfg conf.Providers) Service {
 	svc := new(service)
 	svc.users = users
 	svc.clientIDs = map[user.SocialProvider]string{

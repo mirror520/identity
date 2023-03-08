@@ -1,4 +1,4 @@
-baseurl: api.linyc.idv.tw
+baseUrl: api.linyc.idv.tw
 
 jwt:
   secret: jwt_secret_key
@@ -7,31 +7,30 @@ jwt:
     enabled: true
     maximum: 1h30m
 
-db:
-  driver: mysql
-  host: mysql
-  port: 3306
-  username: jinte
-  password: password
-  dbname: jinte
+persistent: sqlite
 
-redis:
-  host: redis
-  port: 6379
-  password: 
-  db: 0
+databases:
+  # mysql:
+  #   driver: mysql
+  #   name: identity
+  #   host: mysql
+  #   port: 3306
+  #   username: root
+  #   password:
+  sqlite:
+    driver: sqlite
+    name: identity
+  badger:
+    driver: badger
+    name: identity
+  # redis:
+  #   driver: redis
+  #   host: redis
+  #   port: 6379
+  #   name: 0
 
 providers:
   google:
     client: 
       id: google_client_id
       secret: google_client_secret
-
-services:
-  edge:
-    otp: 
-      length: 32
-      timeout: 30m
-    jwt:
-      secret: edge_jwt_secret
-      timeout: 60m               # JWT_TIMEOUT >= OTP_TIMEOUT

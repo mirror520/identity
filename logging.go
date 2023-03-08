@@ -6,10 +6,10 @@ import (
 	"github.com/mirror520/identity/model/user"
 )
 
-func LoggingMiddleware() ServiceMiddleware {
+func LoggingMiddleware(log *zap.Logger) ServiceMiddleware {
 	return func(next Service) Service {
 		return &loggingMiddleware{
-			zap.L().With(
+			log.With(
 				zap.String("service", "identity"),
 				zap.String("middleware", "logging"),
 			),
