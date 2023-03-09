@@ -7,5 +7,5 @@ type Repository interface {
 	// Query
 	Find(id UserID) (*User, error)
 	FindByUsername(username string) (*User, error)
-	FindBySocialID(socialID string) (*User, error)
+	FindBySocialID(socialID SocialID) (*User, error)
 }

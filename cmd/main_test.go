@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/mirror520/identity"
-	"github.com/mirror520/identity/model/conf"
-	"github.com/mirror520/identity/model/user"
+	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/persistent/inmem"
+	"github.com/mirror520/identity/user"
 )
 
 type identityTestSuite struct {

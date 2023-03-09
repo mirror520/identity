@@ -7,8 +7,8 @@ import (
 
 	"google.golang.org/api/idtoken"
 
-	"github.com/mirror520/identity/model/conf"
-	"github.com/mirror520/identity/model/user"
+	"github.com/mirror520/identity/conf"
+	"github.com/mirror520/identity/user"
 )
 
 var (
@@ -88,7 +88,7 @@ func (svc *service) signInWithGoogle(token string) (*user.User, error) {
 		return nil, err
 	}
 
-	socialID := payload.Subject
+	socialID := user.SocialID(payload.Subject)
 	u, err := svc.users.FindBySocialID(socialID)
 	if err != nil {
 		if !errors.Is(err, user.ErrUserNotFound) {
@@ -143,7 +143,7 @@ func (svc *service) AddSocialAccount(credential string, provider user.SocialProv
 		return nil, err
 	}
 
-	socialID := payload.Subject
+	socialID := user.SocialID(payload.Subject)
 	_, err = svc.users.FindBySocialID(socialID)
 	if err == nil {
 		return nil, errors.New("account exists")
@@ -168,7 +168,7 @@ func (svc *service) UserActivatedHandler(e *user.UserActivatedEvent) error {
 }
 
 func (svc *service) UserSocialAccountAddedHandler(e *user.UserSocialAccountAddedEvent) error {
-	u, err := svc.users.Find(e.UserID)
+	u, err := svc.users.Find(e.Event.UserID)
 	if err != nil {
 		return err
 	}

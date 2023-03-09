@@ -9,9 +9,9 @@ import (
 
 	jwt "github.com/appleboy/gin-jwt/v2"
 
+	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/model"
-	"github.com/mirror520/identity/model/conf"
-	"github.com/mirror520/identity/model/user"
+	"github.com/mirror520/identity/user"
 )
 
 var (
@@ -45,7 +45,7 @@ func AuthMiddlware(authenticator Authenticator, cfg conf.Config) (*jwt.GinJWTMid
 
 		// 登入成功之回應處理
 		// from mw.LoginHandler
-		LoginResponse: func(ctx *gin.Context, code int, token string, expire time.Time) {
+		LoginResponse: func(ctx *gin.Context, code int, token string, time time.Time) {
 			v, _ := ctx.Get("user")
 			u, ok := v.(*user.User)
 			if !ok {
@@ -55,8 +55,8 @@ func AuthMiddlware(authenticator Authenticator, cfg conf.Config) (*jwt.GinJWTMid
 			}
 
 			u.Token = user.Token{
-				Token:  token,
-				Expire: expire,
+				Token:     token,
+				ExpiredAt: time,
 			}
 
 			result := model.SuccessResult("signin success")
@@ -72,10 +72,10 @@ func AuthMiddlware(authenticator Authenticator, cfg conf.Config) (*jwt.GinJWTMid
 
 		// 更新 JWT Token 成功之回應處理
 		// from mw.RefreshHandler
-		RefreshResponse: func(ctx *gin.Context, code int, token string, expire time.Time) {
+		RefreshResponse: func(ctx *gin.Context, code int, token string, time time.Time) {
 			newToken := user.Token{
-				Token:  token,
-				Expire: expire,
+				Token:     token,
+				ExpiredAt: time,
 			}
 
 			result := model.SuccessResult("refresh token success")

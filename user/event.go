@@ -29,18 +29,18 @@ func (name EventName) String() string {
 }
 
 type Event struct {
-	Domain string    `json:"domain"`
-	Name   EventName `json:"name"`
-	UserID UserID    `json:"user_id"`
-	Time   time.Time `json:"time"`
+	Domain    string    `json:"domain"`
+	Name      EventName `json:"name"`
+	UserID    UserID    `json:"user_id"` // AggreagateRoot
+	OccuredAt time.Time `json:"occured_at"`
 }
 
 func NewEvent(name EventName, id UserID) *Event {
 	return &Event{
-		Domain: "identity:users",
-		Name:   name,
-		UserID: id,
-		Time:   time.Now(),
+		Domain:    "identity:users",
+		Name:      name,
+		UserID:    id,
+		OccuredAt: time.Now(),
 	}
 }
 

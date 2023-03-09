@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-kit/kit/endpoint"
 
-	"github.com/mirror520/identity/model/user"
+	"github.com/mirror520/identity/user"
 )
 
 type SignInRequest struct {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/mirror520/identity"
 	"github.com/mirror520/identity/model"
-	"github.com/mirror520/identity/model/user"
+	"github.com/mirror520/identity/user"
 )
 
 func SignInHandler(endpoint endpoint.Endpoint) gin.HandlerFunc {

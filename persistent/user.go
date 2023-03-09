@@ -3,11 +3,11 @@ package persistent
 import (
 	"errors"
 
-	"github.com/mirror520/identity/model/conf"
-	"github.com/mirror520/identity/model/user"
+	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/persistent/db"
 	"github.com/mirror520/identity/persistent/inmem"
 	"github.com/mirror520/identity/persistent/kv"
+	"github.com/mirror520/identity/user"
 )
 
 func NewUserRepository(cfg conf.DB) (user.Repository, error) {

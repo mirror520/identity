@@ -6,8 +6,8 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/mirror520/identity/model/conf"
-	"github.com/mirror520/identity/model/user"
+	"github.com/mirror520/identity/conf"
+	"github.com/mirror520/identity/user"
 )
 
 type userRepository struct {
@@ -15,13 +15,13 @@ type userRepository struct {
 }
 
 func NewUserRepository(cfg conf.DB) (user.Repository, error) {
-	db, err := gorm.Open(sqlite.Open(cfg.Name+".sql"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(cfg.Name+".db"), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
 
 	db.AutoMigrate(
-		&user.User{}, &user.SocialAccount{},
+		&User{}, &SocialAccount{},
 	)
 
 	repo := new(userRepository)
@@ -30,7 +30,9 @@ func NewUserRepository(cfg conf.DB) (user.Repository, error) {
 }
 
 func (repo *userRepository) Store(u *user.User) error {
-	result := repo.db.Save(u)
+	user := NewUser(u) // convert Domain to Data model
+
+	result := repo.db.Save(user)
 	if err := result.Error; err != nil {
 		return err
 	}
@@ -39,7 +41,7 @@ func (repo *userRepository) Store(u *user.User) error {
 }
 
 func (repo *userRepository) Find(id user.UserID) (*user.User, error) {
-	var u *user.User
+	var u *User
 
 	result := repo.db.
 		Preload("Accounts").
@@ -55,11 +57,12 @@ func (repo *userRepository) Find(id user.UserID) (*user.User, error) {
 		return nil, err
 	}
 
-	return u, nil
+	user := u.reconstitute()
+	return user, nil
 }
 
 func (repo *userRepository) FindByUsername(username string) (*user.User, error) {
-	var u *user.User
+	var u *User
 
 	result := repo.db.
 		Preload("Accounts").
@@ -75,11 +78,12 @@ func (repo *userRepository) FindByUsername(username string) (*user.User, error) 
 		return nil, err
 	}
 
-	return u, nil
+	user := u.reconstitute()
+	return user, nil
 }
 
-func (repo *userRepository) FindBySocialID(socialID string) (*user.User, error) {
-	var u *user.User
+func (repo *userRepository) FindBySocialID(socialID user.SocialID) (*user.User, error) {
+	var u *User
 	result := repo.db.
 		Preload("Accounts").
 		Joins("INNER JOIN social_accounts ON social_accounts.user_id = users.id").
@@ -94,7 +98,8 @@ func (repo *userRepository) FindBySocialID(socialID string) (*user.User, error) 
 		return nil, err
 	}
 
-	return u, nil
+	user := u.reconstitute()
+	return user, nil
 }
 
 func (repo *userRepository) DB() *gorm.DB {

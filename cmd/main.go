@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/mirror520/identity"
-	"github.com/mirror520/identity/model/conf"
+	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/persistent"
 	"github.com/mirror520/identity/transport/http"
 )

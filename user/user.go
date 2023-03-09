@@ -7,6 +7,7 @@ import (
 	"github.com/oklog/ulid/v2"
 
 	"github.com/mirror520/identity/events"
+	"github.com/mirror520/identity/model"
 )
 
 var (
@@ -46,6 +47,7 @@ type User struct {
 	Accounts []*SocialAccount `json:"accounts"`
 	Avatar   string           `json:"avatar"`
 	Token    Token            `json:"token"`
+	model.Model
 
 	events.EventStore `json:"-"`
 }
@@ -79,7 +81,7 @@ func (u *User) Activate() {
 	u.AddEvent(e)
 }
 
-func (u *User) AddSocialAccount(provider SocialProvider, socialID string) {
+func (u *User) AddSocialAccount(provider SocialProvider, socialID SocialID) {
 	account := NewSocialAccount(provider, socialID)
 
 	if u.Accounts == nil {
@@ -99,19 +101,22 @@ const (
 	LINE     SocialProvider = "line"
 )
 
+type SocialID string
+
 type SocialAccount struct {
-	SocialID string         `json:"social_id"`
+	SocialID SocialID       `json:"social_id"`
 	Provider SocialProvider `json:"social_provider"`
+	model.Model
 }
 
-func NewSocialAccount(provider SocialProvider, socialID string) *SocialAccount {
+func NewSocialAccount(provider SocialProvider, id SocialID) *SocialAccount {
 	return &SocialAccount{
-		SocialID: socialID,
+		SocialID: id,
 		Provider: provider,
 	}
 }
 
 type Token struct {
-	Token  string    `json:"token"`
-	Expire time.Time `json:"expire"`
+	Token     string    `json:"token"`
+	ExpiredAt time.Time `json:"expired_at"`
 }

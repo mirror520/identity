@@ -6,8 +6,8 @@ import (
 
 	"github.com/dgraph-io/badger/v3"
 
-	"github.com/mirror520/identity/model/conf"
-	"github.com/mirror520/identity/model/user"
+	"github.com/mirror520/identity/conf"
+	"github.com/mirror520/identity/user"
 )
 
 type userRepository struct {
@@ -64,7 +64,7 @@ func (repo *userRepository) FindByUsername(username string) (*user.User, error) 
 	return repo.find([]byte("username:" + username))
 }
 
-func (repo *userRepository) FindBySocialID(socialID string) (*user.User, error) {
+func (repo *userRepository) FindBySocialID(socialID user.SocialID) (*user.User, error) {
 	return repo.find([]byte("social:" + socialID))
 }
 

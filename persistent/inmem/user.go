@@ -3,13 +3,13 @@ package inmem
 import (
 	"sync"
 
-	"github.com/mirror520/identity/model/user"
+	"github.com/mirror520/identity/user"
 )
 
 type userRepository struct {
-	users     map[user.UserID]*user.User // map[UserID]*user.User
-	usernames map[string]*user.User      // map[Username]*user.User
-	socials   map[string]*user.User      // map[SocialID]*user.User
+	users     map[user.UserID]*user.User   // map[UserID]*user.User
+	usernames map[string]*user.User        // map[Username]*user.User
+	socials   map[user.SocialID]*user.User // map[SocialID]*user.User
 	sync.RWMutex
 }
 
@@ -17,7 +17,7 @@ func NewUserRepository() (user.Repository, error) {
 	repo := new(userRepository)
 	repo.users = make(map[user.UserID]*user.User)
 	repo.usernames = make(map[string]*user.User)
-	repo.socials = make(map[string]*user.User)
+	repo.socials = make(map[user.SocialID]*user.User)
 	return repo, nil
 }
 
@@ -59,7 +59,7 @@ func (repo *userRepository) FindByUsername(username string) (*user.User, error) 
 	return u, nil
 }
 
-func (repo *userRepository) FindBySocialID(socialID string) (*user.User, error) {
+func (repo *userRepository) FindBySocialID(socialID user.SocialID) (*user.User, error) {
 	repo.RLock()
 	defer repo.RUnlock()
 

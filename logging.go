@@ -3,7 +3,7 @@ package identity
 import (
 	"go.uber.org/zap"
 
-	"github.com/mirror520/identity/model/user"
+	"github.com/mirror520/identity/user"
 )
 
 func LoggingMiddleware(log *zap.Logger) ServiceMiddleware {
@@ -125,7 +125,7 @@ func (mw *loggingMiddleware) UserActivatedHandler(e *user.UserActivatedEvent) er
 func (mw *loggingMiddleware) UserSocialAccountAddedHandler(e *user.UserSocialAccountAddedEvent) error {
 	log := mw.log.With(
 		zap.String("event", e.EventName()),
-		zap.String("user_id", e.UserID.String()),
+		zap.String("user_id", e.Event.UserID.String()),
 	)
 
 	err := mw.next.UserSocialAccountAddedHandler(e)
