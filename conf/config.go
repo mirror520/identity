@@ -152,6 +152,7 @@ type DB struct {
 	Port     int
 	Username string
 	Password string
+	InMem    bool
 }
 
 func (db *DB) UnmarshalYAML(value *yaml.Node) error {
@@ -162,6 +163,7 @@ func (db *DB) UnmarshalYAML(value *yaml.Node) error {
 		Port     int
 		Username string
 		Password string
+		InMem    bool
 	}
 
 	if err := value.Decode(&raw); err != nil {
@@ -179,6 +181,7 @@ func (db *DB) UnmarshalYAML(value *yaml.Node) error {
 	db.Port = raw.Port
 	db.Username = raw.Username
 	db.Password = raw.Password
+	db.InMem = raw.InMem
 
 	return nil
 }

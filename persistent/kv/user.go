@@ -16,6 +16,9 @@ type userRepository struct {
 
 func NewUserRepository(cfg conf.DB) (user.Repository, error) {
 	opts := badger.DefaultOptions(cfg.Name)
+	if cfg.InMem {
+		opts = badger.DefaultOptions("").WithInMemory(true)
+	}
 
 	db, err := badger.Open(opts)
 	if err != nil {
@@ -89,4 +92,12 @@ func (repo *userRepository) find(key []byte) (*user.User, error) {
 	}
 
 	return u, nil
+}
+
+func (repo *userRepository) DB() *badger.DB {
+	return repo.db
+}
+
+func (repo *userRepository) Close() error {
+	return repo.db.Close()
 }

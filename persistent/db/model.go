@@ -1,7 +1,6 @@
 package db
 
 import (
-	"github.com/oklog/ulid/v2"
 	"gorm.io/gorm"
 
 	"github.com/mirror520/identity/model"
@@ -24,13 +23,6 @@ func NewUser(u *user.User) *User {
 		accounts[i] = NewSocialAccount(a, u)
 	}
 
-	deletedAt := gorm.DeletedAt{
-		Time: u.DeletedAt,
-	}
-	if u.DeletedAt.IsZero() {
-		deletedAt.Valid = false
-	}
-
 	return &User{
 		ID:       u.ID.String(),
 		Username: u.Username,
@@ -41,7 +33,10 @@ func NewUser(u *user.User) *User {
 		DataModel: model.DataModel{
 			CreatedAt: u.CreatedAt,
 			UpdatedAt: u.UpdatedAt,
-			DeletedAt: deletedAt,
+			DeletedAt: gorm.DeletedAt{
+				Time:  u.DeletedAt,
+				Valid: !u.DeletedAt.IsZero(),
+			},
 		},
 	}
 }
@@ -53,12 +48,17 @@ func (u *User) reconstitute() *user.User {
 	}
 
 	return &user.User{
-		ID:       user.UserID(ulid.MustParse(u.ID)),
+		ID:       user.NewID(u.ID),
 		Username: u.Username,
 		Name:     u.Name,
 		Email:    u.Email,
 		Status:   u.Status,
 		Accounts: accounts,
+		Model: model.Model{
+			CreatedAt: u.CreatedAt,
+			UpdatedAt: u.UpdatedAt,
+			DeletedAt: u.DeletedAt.Time,
+		},
 	}
 }
 
@@ -70,14 +70,6 @@ type SocialAccount struct {
 }
 
 func NewSocialAccount(a *user.SocialAccount, u *user.User) *SocialAccount {
-	deletedAt := gorm.DeletedAt{
-		Time: a.DeletedAt,
-	}
-
-	if a.DeletedAt.IsZero() {
-		deletedAt.Valid = false
-	}
-
 	return &SocialAccount{
 		UserID:   u.ID.String(),
 		SocialID: a.SocialID,
@@ -85,7 +77,10 @@ func NewSocialAccount(a *user.SocialAccount, u *user.User) *SocialAccount {
 		DataModel: model.DataModel{
 			CreatedAt: a.CreatedAt,
 			UpdatedAt: a.UpdatedAt,
-			DeletedAt: deletedAt,
+			DeletedAt: gorm.DeletedAt{
+				Time:  a.DeletedAt,
+				Valid: !a.DeletedAt.IsZero(),
+			},
 		},
 	}
 }

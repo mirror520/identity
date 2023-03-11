@@ -37,7 +37,7 @@ func (repo *userRepository) Store(u *user.User) error {
 
 func (repo *userRepository) Find(id user.UserID) (*user.User, error) {
 	repo.RLock()
-	defer repo.Unlock()
+	defer repo.RUnlock()
 
 	u, ok := repo.users[id]
 	if !ok {
@@ -49,7 +49,7 @@ func (repo *userRepository) Find(id user.UserID) (*user.User, error) {
 
 func (repo *userRepository) FindByUsername(username string) (*user.User, error) {
 	repo.RLock()
-	defer repo.Unlock()
+	defer repo.RUnlock()
 
 	u, ok := repo.usernames[username]
 	if !ok {

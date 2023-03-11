@@ -15,7 +15,12 @@ type userRepository struct {
 }
 
 func NewUserRepository(cfg conf.DB) (user.Repository, error) {
-	db, err := gorm.Open(sqlite.Open(cfg.Name+".db"), &gorm.Config{})
+	filename := cfg.Name + ".db"
+	if cfg.InMem {
+		filename = "file::memory:?cache=shared"
+	}
+
+	db, err := gorm.Open(sqlite.Open(filename), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}

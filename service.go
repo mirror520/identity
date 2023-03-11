@@ -164,6 +164,8 @@ func (svc *service) UserActivatedHandler(e *user.UserActivatedEvent) error {
 	}
 
 	u.Status = e.Status
+	u.UpdatedAt = e.OccuredAt
+
 	return svc.users.Store(u)
 }
 
@@ -174,5 +176,7 @@ func (svc *service) UserSocialAccountAddedHandler(e *user.UserSocialAccountAdded
 	}
 
 	u.Accounts = append(u.Accounts, e.SocialAccount)
+	u.UpdatedAt = e.OccuredAt
+
 	return svc.users.Store(u)
 }

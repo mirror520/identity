@@ -1,2 +1,4 @@
 /.vscode/
+/persistent/kv/identity/
 config.yaml
+*.db

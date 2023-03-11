@@ -35,12 +35,12 @@ type Event struct {
 	OccuredAt time.Time `json:"occured_at"`
 }
 
-func NewEvent(name EventName, id UserID) *Event {
+func NewEvent(name EventName, u *User) *Event {
 	return &Event{
 		Domain:    "identity:users",
 		Name:      name,
-		UserID:    id,
-		OccuredAt: time.Now(),
+		UserID:    u.ID,
+		OccuredAt: u.UpdatedAt,
 	}
 }
 
@@ -55,7 +55,7 @@ type UserRegisteredEvent struct {
 
 func NewUserRegisteredEvent(u *User) events.DomainEvent {
 	return &UserRegisteredEvent{
-		Event: NewEvent(UserRegistered, u.ID),
+		Event: NewEvent(UserRegistered, u),
 		User:  u,
 	}
 }
@@ -65,9 +65,9 @@ type UserActivatedEvent struct {
 	Status Status `json:"status"`
 }
 
-func NewUserActivatedEvent(id UserID, status Status) events.DomainEvent {
+func NewUserActivatedEvent(u *User, status Status) events.DomainEvent {
 	return &UserActivatedEvent{
-		Event:  NewEvent(UserActivated, id),
+		Event:  NewEvent(UserActivated, u),
 		Status: status,
 	}
 }
@@ -77,9 +77,9 @@ type UserSocialAccountAddedEvent struct {
 	*SocialAccount
 }
 
-func NewUserSocialAccountAddedEvent(id UserID, account *SocialAccount) events.DomainEvent {
+func NewUserSocialAccountAddedEvent(u *User, account *SocialAccount) events.DomainEvent {
 	return &UserSocialAccountAddedEvent{
-		Event:         NewEvent(UserSocialAccountAdded, id),
+		Event:         NewEvent(UserSocialAccountAdded, u),
 		SocialAccount: account,
 	}
 }

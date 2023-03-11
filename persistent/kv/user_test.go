@@ -1,7 +1,6 @@
-package db
+package kv
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -18,8 +17,9 @@ type userRepositoryTestSuite struct {
 
 func (suite *userRepositoryTestSuite) SetupSuite() {
 	cfg := conf.DB{
-		Driver: conf.SQLite,
+		Driver: conf.BadgerDB,
 		Name:   "identity",
+		// InMem:  true,
 	}
 
 	users, err := NewUserRepository(cfg)
@@ -70,11 +70,10 @@ func (suite *userRepositoryTestSuite) TestFindBySocialID() {
 }
 
 func (suite *userRepositoryTestSuite) TearDownSuite() {
-	db := suite.users.(Database).DB()
-	db.Exec("DROP TABLE social_accounts")
-	db.Exec("DROP TABLE users")
+	users := suite.users.(Database)
+	users.Close()
 
-	os.Remove("identity.db")
+	// os.RemoveAll("identity")
 }
 
 func TestUserRepositoryTestSuite(t *testing.T) {

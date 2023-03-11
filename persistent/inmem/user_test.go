@@ -1,12 +1,10 @@
-package db
+package inmem
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/user"
 )
 
@@ -17,12 +15,7 @@ type userRepositoryTestSuite struct {
 }
 
 func (suite *userRepositoryTestSuite) SetupSuite() {
-	cfg := conf.DB{
-		Driver: conf.SQLite,
-		Name:   "identity",
-	}
-
-	users, err := NewUserRepository(cfg)
+	users, err := NewUserRepository()
 	if err != nil {
 		suite.Fail(err.Error())
 		return
@@ -67,14 +60,6 @@ func (suite *userRepositoryTestSuite) TestFindBySocialID() {
 
 	suite.Equal("mirror770109", user.Username)
 	suite.Equal(sid, user.Accounts[0].SocialID)
-}
-
-func (suite *userRepositoryTestSuite) TearDownSuite() {
-	db := suite.users.(Database).DB()
-	db.Exec("DROP TABLE social_accounts")
-	db.Exec("DROP TABLE users")
-
-	os.Remove("identity.db")
 }
 
 func TestUserRepositoryTestSuite(t *testing.T) {

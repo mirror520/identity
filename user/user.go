@@ -26,8 +26,12 @@ const (
 
 type UserID ulid.ULID // AggregateRoot
 
-func NewID() UserID {
+func MakeID() UserID {
 	return UserID(ulid.Make())
+}
+
+func NewID(id string) UserID {
+	return UserID(ulid.MustParse(id))
 }
 
 func (id UserID) Bytes() []byte {
@@ -36,6 +40,11 @@ func (id UserID) Bytes() []byte {
 
 func (id UserID) String() string {
 	return ulid.ULID(id).String()
+}
+
+func (id UserID) Time() time.Time {
+	ms := ulid.ULID(id).Time()
+	return ulid.Time(ms)
 }
 
 type User struct {
@@ -53,22 +62,28 @@ type User struct {
 }
 
 func NewUser(username string, name string, email string) *User {
+	id := MakeID()
+
 	u := &User{
-		ID:       NewID(),
+		ID:       id,
 		Username: username,
 		Name:     name,
 		Email:    email,
 		Status:   Pending,
+		Model: model.Model{
+			CreatedAt: id.Time(),
+		},
 
 		EventStore: events.NewEventStore(),
 	}
-	u.Register()
 
+	u.Register()
 	return u
 }
 
 func (u *User) Register() {
 	u.Status = Registered
+	u.UpdatedAt = time.Now()
 
 	e := NewUserRegisteredEvent(u)
 	u.AddEvent(e)
@@ -76,8 +91,9 @@ func (u *User) Register() {
 
 func (u *User) Activate() {
 	u.Status = Activated
+	u.UpdatedAt = time.Now()
 
-	e := NewUserActivatedEvent(u.ID, Activated)
+	e := NewUserActivatedEvent(u, Activated)
 	u.AddEvent(e)
 }
 
@@ -89,7 +105,9 @@ func (u *User) AddSocialAccount(provider SocialProvider, socialID SocialID) {
 	}
 	u.Accounts = append(u.Accounts, account)
 
-	e := NewUserSocialAccountAddedEvent(u.ID, account)
+	u.UpdatedAt = account.UpdatedAt
+
+	e := NewUserSocialAccountAddedEvent(u, account)
 	u.AddEvent(e)
 }
 
@@ -113,6 +131,10 @@ func NewSocialAccount(provider SocialProvider, id SocialID) *SocialAccount {
 	return &SocialAccount{
 		SocialID: id,
 		Provider: provider,
+		Model: model.Model{
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		},
 	}
 }
 

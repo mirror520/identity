@@ -2,6 +2,6 @@ package db
 
 import "gorm.io/gorm"
 
-type DBPersistent interface {
+type Database interface {
 	DB() *gorm.DB
 }
