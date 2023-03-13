@@ -8,6 +8,7 @@ type DomainEvent interface {
 
 type EventStore interface {
 	AddEvent(e ...DomainEvent)
+	Events() []DomainEvent
 }
 
 type eventStore struct {
@@ -25,4 +26,8 @@ func (s *eventStore) AddEvent(e ...DomainEvent) {
 	s.Lock()
 	s.events = append(s.events, e...)
 	s.Unlock()
+}
+
+func (s *eventStore) Events() []DomainEvent {
+	return s.events
 }

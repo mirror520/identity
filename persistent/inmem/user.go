@@ -3,6 +3,7 @@ package inmem
 import (
 	"sync"
 
+	"github.com/mirror520/identity/events"
 	"github.com/mirror520/identity/user"
 )
 
@@ -24,6 +25,12 @@ func NewUserRepository() (user.Repository, error) {
 func (repo *userRepository) Store(u *user.User) error {
 	repo.Lock()
 
+	newUser := new(user.User)
+	*newUser = *u
+
+	u = newUser
+	u.EventStore = nil
+
 	repo.users[u.ID] = u
 	repo.usernames[u.Username] = u
 
@@ -44,6 +51,7 @@ func (repo *userRepository) Find(id user.UserID) (*user.User, error) {
 		return nil, user.ErrUserNotFound
 	}
 
+	u.EventStore = events.NewEventStore()
 	return u, nil
 }
 
@@ -56,6 +64,7 @@ func (repo *userRepository) FindByUsername(username string) (*user.User, error) 
 		return nil, user.ErrUserNotFound
 	}
 
+	u.EventStore = events.NewEventStore()
 	return u, nil
 }
 
@@ -68,5 +77,6 @@ func (repo *userRepository) FindBySocialID(socialID user.SocialID) (*user.User, 
 		return nil, user.ErrUserNotFound
 	}
 
+	u.EventStore = events.NewEventStore()
 	return u, nil
 }

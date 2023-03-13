@@ -19,7 +19,7 @@ func (suite *userRepositoryTestSuite) SetupSuite() {
 	cfg := conf.DB{
 		Driver: conf.BadgerDB,
 		Name:   "identity",
-		// InMem:  true,
+		InMem:  true,
 	}
 
 	users, err := NewUserRepository(cfg)

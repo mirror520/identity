@@ -7,6 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v3"
 
 	"github.com/mirror520/identity/conf"
+	"github.com/mirror520/identity/events"
 	"github.com/mirror520/identity/user"
 )
 
@@ -32,6 +33,12 @@ func NewUserRepository(cfg conf.DB) (user.Repository, error) {
 }
 
 func (repo *userRepository) Store(u *user.User) error {
+	newUser := new(user.User)
+	*newUser = *u
+
+	u = newUser
+	u.EventStore = nil
+
 	bs, err := json.Marshal(u)
 	if err != nil {
 		return err
@@ -85,7 +92,13 @@ func (repo *userRepository) find(key []byte) (*user.User, error) {
 		}
 
 		return item.Value(func(val []byte) error {
-			return json.Unmarshal(val, &u)
+			err := json.Unmarshal(val, &u)
+			if err != nil {
+				return err
+			}
+
+			u.EventStore = events.NewEventStore()
+			return nil
 		})
 	}); err != nil {
 		return nil, err

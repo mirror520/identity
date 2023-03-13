@@ -1,7 +1,6 @@
 package db
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -20,6 +19,7 @@ func (suite *userRepositoryTestSuite) SetupSuite() {
 	cfg := conf.DB{
 		Driver: conf.SQLite,
 		Name:   "identity",
+		InMem:  true,
 	}
 
 	users, err := NewUserRepository(cfg)
@@ -74,7 +74,7 @@ func (suite *userRepositoryTestSuite) TearDownSuite() {
 	db.Exec("DROP TABLE social_accounts")
 	db.Exec("DROP TABLE users")
 
-	os.Remove("identity.db")
+	// os.Remove("identity.db")
 }
 
 func TestUserRepositoryTestSuite(t *testing.T) {

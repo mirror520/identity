@@ -3,6 +3,7 @@ package db
 import (
 	"gorm.io/gorm"
 
+	"github.com/mirror520/identity/events"
 	"github.com/mirror520/identity/model"
 	"github.com/mirror520/identity/user"
 )
@@ -59,6 +60,7 @@ func (u *User) reconstitute() *user.User {
 			UpdatedAt: u.UpdatedAt,
 			DeletedAt: u.DeletedAt.Time,
 		},
+		EventStore: events.NewEventStore(),
 	}
 }
 

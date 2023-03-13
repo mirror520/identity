@@ -50,7 +50,7 @@ func (repo *userRepository) Find(id user.UserID) (*user.User, error) {
 
 	result := repo.db.
 		Preload("Accounts").
-		Joins("INNER JOIN social_accounts ON social_accounts.user_id = users.id").
+		Joins("LEFT JOIN social_accounts ON social_accounts.user_id = users.id").
 		Take(&u, "users.id = ? AND social_accounts.deleted_at IS NULL", id.String())
 
 	err := result.Error
@@ -71,7 +71,7 @@ func (repo *userRepository) FindByUsername(username string) (*user.User, error) 
 
 	result := repo.db.
 		Preload("Accounts").
-		Joins("INNER JOIN social_accounts ON social_accounts.user_id = users.id").
+		Joins("LEFT JOIN social_accounts ON social_accounts.user_id = users.id").
 		Take(&u, "users.username = ? AND social_accounts.deleted_at IS NULL", username)
 
 	err := result.Error

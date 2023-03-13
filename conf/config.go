@@ -32,6 +32,7 @@ type Config struct {
 	Persistent DB
 	Databases  map[string]DB
 	Providers  Providers
+	Test       Test
 }
 
 func (cfg *Config) UnmarshalYAML(value *yaml.Node) error {
@@ -41,6 +42,7 @@ func (cfg *Config) UnmarshalYAML(value *yaml.Node) error {
 		Databases  map[string]DB `yaml:"databases"`
 		JWT        JWTConfig     `yaml:"jwt"`
 		Providers  Providers     `yaml:"providers"`
+		Test       Test          `yaml:"test"`
 	}
 
 	if err := value.Decode(&raw); err != nil {
@@ -59,6 +61,7 @@ func (cfg *Config) UnmarshalYAML(value *yaml.Node) error {
 
 	cfg.JWT = raw.JWT
 	cfg.Providers = raw.Providers
+	cfg.Test = raw.Test
 
 	return nil
 }
@@ -157,13 +160,13 @@ type DB struct {
 
 func (db *DB) UnmarshalYAML(value *yaml.Node) error {
 	var raw struct {
-		Driver   string
-		Name     string
-		Host     string
-		Port     int
-		Username string
-		Password string
-		InMem    bool
+		Driver   string `yaml:"driver"`
+		Name     string `yaml:"name"`
+		Host     string `yaml:"host"`
+		Port     int    `yaml:"port"`
+		Username string `yaml:"username"`
+		Password string `yaml:"password"`
+		InMem    bool   `yaml:"inmem"`
 	}
 
 	if err := value.Decode(&raw); err != nil {
@@ -193,4 +196,8 @@ type Providers struct {
 			Secret string
 		}
 	}
+}
+
+type Test struct {
+	Token string
 }

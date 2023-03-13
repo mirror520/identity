@@ -34,3 +34,6 @@ providers:
     client: 
       id: google_client_id
       secret: google_client_secret
+
+test:
+  token: YOUR_GOOGLE_JWT_TOKEN
