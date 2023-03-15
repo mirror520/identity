@@ -102,6 +102,10 @@ func (suite *identityTestSuite) TestSignInWithGoogle() {
 	suite.Equal(user.UserActivated.String(), u.Events()[2].EventName())
 }
 
+func (suite *identityTestSuite) TearDownSuite() {
+	suite.users.Close()
+}
+
 func TestIdentityTestSuite(t *testing.T) {
 	suite.Run(t, new(identityTestSuite))
 }

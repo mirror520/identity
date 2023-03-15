@@ -10,4 +10,6 @@ type Repository interface {
 	Find(id UserID) (*User, error)
 	FindByUsername(username string) (*User, error)
 	FindBySocialID(socialID SocialID) (*User, error)
+
+	Close() error
 }

@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -38,6 +40,7 @@ func main() {
 		log.Fatal(err.Error())
 		return
 	}
+	defer repo.Close()
 
 	var authenticator http.Authenticator
 	{
@@ -59,4 +62,10 @@ func main() {
 	r.PATCH("/login", authMiddleware.LoginHandler)
 
 	r.Run(":8080")
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	sign := <-quit
+	log.Info(sign.String())
 }

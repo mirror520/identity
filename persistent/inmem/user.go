@@ -80,3 +80,7 @@ func (repo *userRepository) FindBySocialID(socialID user.SocialID) (*user.User, 
 	u.EventStore = events.NewEventStore()
 	return u, nil
 }
+
+func (repo *userRepository) Close() error {
+	return nil
+}

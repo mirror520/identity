@@ -107,6 +107,10 @@ func (repo *userRepository) FindBySocialID(socialID user.SocialID) (*user.User, 
 	return user, nil
 }
 
+func (repo *userRepository) Close() error {
+	return nil
+}
+
 func (repo *userRepository) DB() *gorm.DB {
 	return repo.db
 }
