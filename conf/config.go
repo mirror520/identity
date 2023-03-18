@@ -27,6 +27,7 @@ func LoadConfig(path string) (*Config, error) {
 }
 
 type Config struct {
+	Name       string
 	BaseURL    string
 	JWT        JWTConfig
 	Persistent DB
@@ -37,6 +38,7 @@ type Config struct {
 
 func (cfg *Config) UnmarshalYAML(value *yaml.Node) error {
 	var raw struct {
+		Name       string        `yaml:"name"`
 		BaseURL    string        `yaml:"baseUrl"`
 		Persistent string        `yaml:"persistent"`
 		Databases  map[string]DB `yaml:"databases"`
@@ -49,6 +51,7 @@ func (cfg *Config) UnmarshalYAML(value *yaml.Node) error {
 		return err
 	}
 
+	cfg.Name = raw.Name
 	cfg.BaseURL = raw.BaseURL
 	cfg.Databases = raw.Databases
 
