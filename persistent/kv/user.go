@@ -15,7 +15,7 @@ type userRepository struct {
 	db *badger.DB
 }
 
-func NewUserRepository(cfg conf.DB) (user.Repository, error) {
+func NewUserRepository(cfg conf.Persistent) (user.Repository, error) {
 	opts := badger.DefaultOptions(cfg.Name)
 	if cfg.InMem {
 		opts = badger.DefaultOptions("").WithInMemory(true)

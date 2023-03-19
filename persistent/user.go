@@ -10,7 +10,7 @@ import (
 	"github.com/mirror520/identity/user"
 )
 
-func NewUserRepository(cfg conf.DB) (user.Repository, error) {
+func NewUserRepository(cfg conf.Persistent) (user.Repository, error) {
 	switch cfg.Driver {
 	case conf.SQLite:
 		return db.NewUserRepository(cfg)

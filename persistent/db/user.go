@@ -14,7 +14,7 @@ type userRepository struct {
 	db *gorm.DB
 }
 
-func NewUserRepository(cfg conf.DB) (user.Repository, error) {
+func NewUserRepository(cfg conf.Persistent) (user.Repository, error) {
 	filename := cfg.Name + ".db"
 	if cfg.InMem {
 		filename = "file::memory:?cache=shared"

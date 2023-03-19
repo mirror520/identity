@@ -9,27 +9,27 @@ jwt:
     enabled: true
     maximum: 1h30m
 
-persistent: badger
+persistent:
+  driver: badger
+  name: identity
 
-databases:
-  # mysql:
-  #   driver: mysql
-  #   name: identity
-  #   host: mysql
-  #   port: 3306
-  #   username: root
-  #   password:
-  sqlite:
-    driver: sqlite
-    name: identity
-  badger:
-    driver: badger
-    name: identity
-  # redis:
-  #   driver: redis
-  #   host: redis
-  #   port: 6379
-  #   name: 0
+transport:
+  provider: nats
+  host: nats
+  port: 4222
+  streams:
+  - name: USERS
+    config: |
+    {
+      "subjects": [
+        "users.>"
+      ]
+    }
+  consumers:
+  - name: $name
+    stream: USERS
+    config: |
+    {}
 
 providers:
   google:

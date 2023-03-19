@@ -1,6 +1,7 @@
 package conf
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"time"
@@ -27,49 +28,16 @@ func LoadConfig(path string) (*Config, error) {
 }
 
 type Config struct {
-	Name       string
-	BaseURL    string
-	JWT        JWTConfig
-	Persistent DB
-	Databases  map[string]DB
-	Providers  Providers
-	Test       Test
+	Name       string     `yaml:"name"`
+	BaseURL    string     `yaml:"baseUrl"`
+	JWT        JWT        `yaml:"jwt"`
+	Persistent Persistent `yaml:"persistent"`
+	Transport  Transport  `yaml:"transport"`
+	Providers  Providers  `yaml:"providers"`
+	Test       Test       `yaml:"test"`
 }
 
-func (cfg *Config) UnmarshalYAML(value *yaml.Node) error {
-	var raw struct {
-		Name       string        `yaml:"name"`
-		BaseURL    string        `yaml:"baseUrl"`
-		Persistent string        `yaml:"persistent"`
-		Databases  map[string]DB `yaml:"databases"`
-		JWT        JWTConfig     `yaml:"jwt"`
-		Providers  Providers     `yaml:"providers"`
-		Test       Test          `yaml:"test"`
-	}
-
-	if err := value.Decode(&raw); err != nil {
-		return err
-	}
-
-	cfg.Name = raw.Name
-	cfg.BaseURL = raw.BaseURL
-	cfg.Databases = raw.Databases
-
-	db, ok := raw.Databases[raw.Persistent]
-	if !ok {
-		return errors.New("db not found")
-	}
-
-	cfg.Persistent = db
-
-	cfg.JWT = raw.JWT
-	cfg.Providers = raw.Providers
-	cfg.Test = raw.Test
-
-	return nil
-}
-
-type JWTConfig struct {
+type JWT struct {
 	Secret  string
 	Timeout time.Duration
 	Refresh struct {
@@ -78,7 +46,7 @@ type JWTConfig struct {
 	}
 }
 
-func (cfg *JWTConfig) UnmarshalYAML(value *yaml.Node) error {
+func (cfg *JWT) UnmarshalYAML(value *yaml.Node) error {
 	var raw struct {
 		Secret  string
 		Timeout string
@@ -125,20 +93,15 @@ func (cfg *JWTConfig) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-type DBDriver int
+type PersistentDriver int
 
 const (
-	SQLite DBDriver = iota
-	// MySQL
-	// PostgreSQL
-
+	SQLite PersistentDriver = iota
 	BadgerDB
-	// Redis
-
 	InMem
 )
 
-func parseDBDriver(driver string) (DBDriver, error) {
+func ParsePersistentDriver(driver string) (PersistentDriver, error) {
 	switch driver {
 	case "sqlite":
 		return SQLite, nil
@@ -151,8 +114,8 @@ func parseDBDriver(driver string) (DBDriver, error) {
 	}
 }
 
-type DB struct {
-	Driver   DBDriver
+type Persistent struct {
+	Driver   PersistentDriver
 	Name     string
 	Host     string
 	Port     int
@@ -161,7 +124,7 @@ type DB struct {
 	InMem    bool
 }
 
-func (db *DB) UnmarshalYAML(value *yaml.Node) error {
+func (p *Persistent) UnmarshalYAML(value *yaml.Node) error {
 	var raw struct {
 		Driver   string `yaml:"driver"`
 		Name     string `yaml:"name"`
@@ -176,18 +139,111 @@ func (db *DB) UnmarshalYAML(value *yaml.Node) error {
 		return err
 	}
 
-	driver, err := parseDBDriver(raw.Driver)
+	driver, err := ParsePersistentDriver(raw.Driver)
 	if err != nil {
 		return err
 	}
 
-	db.Driver = driver
-	db.Name = raw.Name
-	db.Host = raw.Host
-	db.Port = raw.Port
-	db.Username = raw.Username
-	db.Password = raw.Password
-	db.InMem = raw.InMem
+	p.Driver = driver
+	p.Name = raw.Name
+	p.Host = raw.Host
+	p.Port = raw.Port
+	p.Username = raw.Username
+	p.Password = raw.Password
+	p.InMem = raw.InMem
+
+	return nil
+}
+
+type TransportProvider int
+
+const NATS TransportProvider = iota
+
+func ParseTransportProvider(provider string) (TransportProvider, error) {
+	switch provider {
+	case "nats":
+		return NATS, nil
+	default:
+		return -1, errors.New("provider not supported")
+	}
+}
+
+type Transport struct {
+	Provider  TransportProvider
+	Host      string
+	Port      int
+	Streams   []Stream
+	Consumers []Consumer
+}
+
+func (t *Transport) UnmarshalYAML(value *yaml.Node) error {
+	var raw struct {
+		Provider  string     `yaml:"provider"`
+		Host      string     `yaml:"host"`
+		Port      int        `yam:"port"`
+		Streams   []Stream   `yaml:"streams"`
+		Consumers []Consumer `yaml:"consumers"`
+	}
+
+	if err := value.Decode(&raw); err != nil {
+		return err
+	}
+
+	provider, err := ParseTransportProvider(raw.Provider)
+	if err != nil {
+		return err
+	}
+
+	t.Provider = provider
+	t.Host = raw.Host
+	t.Port = raw.Port
+	t.Streams = raw.Streams
+	t.Consumers = raw.Consumers
+
+	return nil
+}
+
+type Stream struct {
+	Name   string
+	Config json.RawMessage
+}
+
+func (s *Stream) UnmarshalYAML(value *yaml.Node) error {
+	var raw struct {
+		Name   string
+		Config string
+	}
+
+	if err := value.Decode(&raw); err != nil {
+		return err
+	}
+
+	s.Name = raw.Name
+	s.Config = json.RawMessage(raw.Config)
+
+	return nil
+}
+
+type Consumer struct {
+	Name   string
+	Stream string
+	Config json.RawMessage
+}
+
+func (c *Consumer) UnmarshalYAML(value *yaml.Node) error {
+	var raw struct {
+		Name   string
+		Stream string
+		Config string
+	}
+
+	if err := value.Decode(&raw); err != nil {
+		return err
+	}
+
+	c.Name = raw.Name
+	c.Stream = raw.Stream
+	c.Config = json.RawMessage(raw.Config)
 
 	return nil
 }

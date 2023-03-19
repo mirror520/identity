@@ -16,7 +16,7 @@ type userRepositoryTestSuite struct {
 }
 
 func (suite *userRepositoryTestSuite) SetupSuite() {
-	cfg := conf.DB{
+	cfg := conf.Persistent{
 		Driver: conf.BadgerDB,
 		Name:   "identity",
 		InMem:  true,
