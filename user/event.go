@@ -16,6 +16,19 @@ const (
 	UserSocialAccountAdded
 )
 
+func ParseEventName(s string) EventName {
+	switch s {
+	case "user_registered":
+		return UserRegistered
+	case "user_activated":
+		return UserActivated
+	case "user_social_account_added":
+		return UserSocialAccountAdded
+	default:
+		return Unknown
+	}
+}
+
 func (name EventName) String() string {
 	switch name {
 	case UserRegistered:
@@ -50,7 +63,8 @@ func (e *Event) EventName() string {
 }
 
 func (e *Event) Topic() string {
-	return strings.TrimPrefix(e.Name.String(), "user_")
+	name := strings.TrimPrefix(e.Name.String(), "user_")
+	return "users." + e.UserID.String() + "." + name
 }
 
 type UserRegisteredEvent struct {
