@@ -24,6 +24,11 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
+	// TODO
+	if cfg.Persistent.Host == "" {
+		cfg.Persistent.Host = path
+	}
+
 	return cfg, nil
 }
 

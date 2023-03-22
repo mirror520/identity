@@ -11,7 +11,7 @@ jwt:
 
 persistent:
   driver: badger
-  name: identity
+  name: users
 
 eventBus:
   provider: nats
@@ -30,7 +30,9 @@ eventBus:
       name: identity-1
       stream: USERS
       config: |
-        {}
+        {
+          "ack_policy": "explicit"
+        }
 
 providers:
   google:

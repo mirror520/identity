@@ -4,14 +4,17 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/urfave/cli"
 	"go.uber.org/zap"
 
 	"github.com/mirror520/identity"
 	"github.com/mirror520/identity/conf"
+	"github.com/mirror520/identity/events"
 	"github.com/mirror520/identity/persistent"
 	"github.com/mirror520/identity/pubsub/nats"
 	"github.com/mirror520/identity/transport/http"
@@ -19,19 +22,49 @@ import (
 )
 
 func main() {
-	path, ok := os.LookupEnv("IDENTITY_PATH")
-	if !ok {
-		path = "."
+	app := &cli.App{
+		Name:  "identity",
+		Usage: "manage user authentication and authorization",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:   "path",
+				Usage:  "work directory",
+				EnvVar: "IDENTITY_PATH",
+			},
+			&cli.IntFlag{
+				Name:   "port",
+				Usage:  "service port",
+				Value:  8080,
+				EnvVar: "IDENTITY_PORT",
+			},
+		},
+		Action: run,
+	}
+
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run(cli *cli.Context) error {
+	path := cli.String("path")
+	if path == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+
+		path = homeDir + "/.identity"
 	}
 
 	cfg, err := conf.LoadConfig(path)
 	if err != nil {
-		log.Fatal(err.Error())
+		return err
 	}
 
 	log, err := zap.NewDevelopment()
 	if err != nil {
-		log.Fatal(err.Error())
+		return err
 	}
 	defer log.Sync()
 
@@ -39,24 +72,25 @@ func main() {
 
 	pubSub, err := nats.NewPullBasedPubSub(cfg.EventBus)
 	if err != nil {
-		log.Fatal(err.Error())
+		return err
 	}
 	defer pubSub.Close()
 
+	events.ReplaceGlobals(pubSub)
+
 	stream := cfg.EventBus.Users.Stream
 	if err := pubSub.AddStream(stream.Name, stream.Config); err != nil {
-		log.Fatal(err.Error())
+		return err
 	}
 
 	consumer := cfg.EventBus.Users.Consumer
 	if err := pubSub.AddConsumer(consumer.Name, stream.Name, consumer.Config); err != nil {
-		log.Fatal(err.Error())
+		return err
 	}
 
 	repo, err := persistent.NewUserRepository(cfg.Persistent)
 	if err != nil {
-		log.Fatal(err.Error())
-		return
+		return err
 	}
 	defer repo.Close()
 
@@ -66,35 +100,37 @@ func main() {
 	svc := identity.NewService(repo, cfg.Providers)
 	svc = identity.LoggingMiddleware(log)(svc)
 
-	// PATCH /signin
+	apiV1 := r.Group("/v1/identity")
 	{
-		endpoint := identity.SignInEndpoint(svc)
-		authenticator := http.SignInAuthenticator(endpoint)
-		authMiddleware, err := http.AuthMiddlware(authenticator, *cfg)
-		if err != nil {
-			log.Fatal(err.Error())
-			return
+		// PATCH /signin
+		{
+			endpoint := identity.SignInEndpoint(svc)
+			authenticator := http.SignInAuthenticator(endpoint)
+			authMiddleware, err := http.AuthMiddlware(authenticator, *cfg)
+			if err != nil {
+				return err
+			}
+
+			apiV1.PATCH("/signin", authMiddleware.LoginHandler)
 		}
 
-		r.PATCH("/signin", authMiddleware.LoginHandler)
-	}
+		// POST /users
+		{
+			endpoint := identity.RegisterEndpoint(svc)
+			apiV1.POST("/users", http.RegisterHandler(endpoint))
+		}
 
-	// POST /users
-	{
-		endpoint := identity.RegisterEndpoint(svc)
-		r.POST("/users", http.RegisterHandler(endpoint))
-	}
+		// PATCH /users/:id/verify
+		{
+			endpoint := identity.OTPVerifyEndpoint(svc)
+			apiV1.POST("/users/:id/verify", http.OTPVerifyHandler(endpoint))
+		}
 
-	// PATCH /users/:id/verify
-	{
-		endpoint := identity.OTPVerifyEndpoint(svc)
-		r.POST("/users/:id/verify", http.OTPVerifyHandler(endpoint))
-	}
-
-	// PUT /users/id/socials
-	{
-		endpoint := identity.AddSocialAccountEndpoint(svc)
-		r.POST("/users/:id/socials", http.AddSocialAccountHandler(endpoint))
+		// PUT /users/id/socials
+		{
+			endpoint := identity.AddSocialAccountEndpoint(svc)
+			apiV1.POST("/users/:id/socials", http.AddSocialAccountHandler(endpoint))
+		}
 	}
 
 	// SUB users.>
@@ -103,11 +139,14 @@ func main() {
 		pubSub.PullSubscribe(consumer.Name, stream.Name, pubsub.EventHandler(endpoint))
 	}
 
-	r.Run(":8080")
+	port := cli.Int("port")
+	go r.Run(":" + strconv.Itoa(port))
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	sign := <-quit
 	log.Info(sign.String())
+
+	return nil
 }

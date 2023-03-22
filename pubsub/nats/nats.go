@@ -3,6 +3,7 @@ package nats
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"sync"
 
@@ -168,7 +169,7 @@ func (ps *pubSub) pull(ctx context.Context, sub *nats.Subscription, callback pub
 
 		default:
 			msgs, err := sub.Fetch(100)
-			if err != nil {
+			if err != nil && !errors.Is(err, nats.ErrTimeout) {
 				log.Error(err.Error())
 				continue
 			}
@@ -181,11 +182,12 @@ func (ps *pubSub) pull(ctx context.Context, sub *nats.Subscription, callback pub
 
 				err := callback(context.Background(), msg)
 				if err != nil {
-					meta, err := m.Metadata()
-					if err != nil {
-						log.Error(err.Error(),
+					meta, metaErr := m.Metadata()
+					if metaErr != nil {
+						log.Error(metaErr.Error(),
 							zap.String("topic", m.Subject),
 						)
+
 						continue
 					}
 

@@ -16,7 +16,7 @@ type userRepository struct {
 }
 
 func NewUserRepository(cfg conf.Persistent) (user.Repository, error) {
-	opts := badger.DefaultOptions(cfg.Name)
+	opts := badger.DefaultOptions(cfg.Host + "/" + cfg.Name)
 	if cfg.InMem {
 		opts = badger.DefaultOptions("").WithInMemory(true)
 	}

@@ -31,7 +31,7 @@ func EventHandler(endpoint endpoint.Endpoint) pubsub.MessageHandler {
 			event = e
 
 		case user.UserActivated:
-			var e *user.UserRegisteredEvent
+			var e *user.UserActivatedEvent
 			if err := json.Unmarshal(msg.Data, &e); err != nil {
 				return err
 			}

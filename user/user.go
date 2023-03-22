@@ -1,6 +1,7 @@
 package user
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -49,6 +50,26 @@ func (id UserID) String() string {
 func (id UserID) Time() time.Time {
 	ms := ulid.ULID(id).Time()
 	return ulid.Time(ms)
+}
+
+func (id *UserID) MarshalJSON() ([]byte, error) {
+	jsonStr := `"` + id.String() + `"`
+	return []byte(jsonStr), nil
+}
+
+func (id *UserID) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+
+	userID, err := ParseID(s)
+	if err != nil {
+		return err
+	}
+
+	*id = userID
+	return nil
 }
 
 type User struct {

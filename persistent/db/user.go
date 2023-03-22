@@ -15,7 +15,7 @@ type userRepository struct {
 }
 
 func NewUserRepository(cfg conf.Persistent) (user.Repository, error) {
-	filename := cfg.Name + ".db"
+	filename := cfg.Host + "/" + cfg.Name + ".db"
 	if cfg.InMem {
 		filename = "file::memory:?cache=shared"
 	}
