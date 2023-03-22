@@ -13,7 +13,9 @@ import (
 	"github.com/mirror520/identity"
 	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/persistent"
+	"github.com/mirror520/identity/pubsub/nats"
 	"github.com/mirror520/identity/transport/http"
+	"github.com/mirror520/identity/transport/pubsub"
 )
 
 func main() {
@@ -29,11 +31,27 @@ func main() {
 
 	log, err := zap.NewDevelopment()
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(err.Error())
 	}
 	defer log.Sync()
 
 	zap.ReplaceGlobals(log)
+
+	pubSub, err := nats.NewPullBasedPubSub(cfg.EventBus)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	defer pubSub.Close()
+
+	stream := cfg.EventBus.Users.Stream
+	if err := pubSub.AddStream(stream.Name, stream.Config); err != nil {
+		log.Fatal(err.Error())
+	}
+
+	consumer := cfg.EventBus.Users.Consumer
+	if err := pubSub.AddConsumer(consumer.Name, stream.Name, consumer.Config); err != nil {
+		log.Fatal(err.Error())
+	}
 
 	repo, err := persistent.NewUserRepository(cfg.Persistent)
 	if err != nil {
@@ -42,24 +60,28 @@ func main() {
 	}
 	defer repo.Close()
 
-	var authenticator http.Authenticator
-	{
-		svc := identity.NewService(repo, cfg.Providers)
-		svc = identity.LoggingMiddleware(log)(svc)
-		endpoint := identity.SignInEndpoint(svc)
-		authenticator = http.SignInAuthenticator(endpoint)
-	}
-
-	authMiddleware, err := http.AuthMiddlware(authenticator, *cfg)
-	if err != nil {
-		log.Fatal(err.Error())
-		return
-	}
-
 	r := gin.Default()
 	r.Use(cors.Default())
 
-	r.PATCH("/login", authMiddleware.LoginHandler)
+	svc := identity.NewService(repo, cfg.Providers)
+	svc = identity.LoggingMiddleware(log)(svc)
+
+	{
+		endpoint := identity.SignInEndpoint(svc)
+		authenticator := http.SignInAuthenticator(endpoint)
+		authMiddleware, err := http.AuthMiddlware(authenticator, *cfg)
+		if err != nil {
+			log.Fatal(err.Error())
+			return
+		}
+
+		r.PATCH("/login", authMiddleware.LoginHandler)
+	}
+
+	{
+		endpoint := identity.EventEndpoint(svc)
+		pubSub.PullSubscribe(consumer.Name, stream.Name, pubsub.EventHandler(endpoint))
+	}
 
 	r.Run(":8080")
 

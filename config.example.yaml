@@ -13,23 +13,24 @@ persistent:
   driver: badger
   name: identity
 
-transport:
+eventBus:
   provider: nats
   host: nats
   port: 4222
-  streams:
-  - name: USERS
-    config: |
-    {
-      "subjects": [
-        "users.>"
-      ]
-    }
-  consumers:
-  - name: $name
-    stream: USERS
-    config: |
-    {}
+  users:
+    stream:
+      name: USERS
+      config: |
+        {
+          "subjects": [
+            "users.>"
+          ]
+        }
+    consumer:
+      name: identity-1
+      stream: USERS
+      config: |
+        {}
 
 providers:
   google:

@@ -32,7 +32,7 @@ type Config struct {
 	BaseURL    string     `yaml:"baseUrl"`
 	JWT        JWT        `yaml:"jwt"`
 	Persistent Persistent `yaml:"persistent"`
-	Transport  Transport  `yaml:"transport"`
+	EventBus   EventBus   `yaml:"eventBus"`
 	Providers  Providers  `yaml:"providers"`
 	Test       Test       `yaml:"test"`
 }
@@ -168,21 +168,19 @@ func ParseTransportProvider(provider string) (TransportProvider, error) {
 	}
 }
 
-type Transport struct {
-	Provider  TransportProvider
-	Host      string
-	Port      int
-	Streams   []Stream
-	Consumers []Consumer
+type EventBus struct {
+	Provider TransportProvider
+	Host     string
+	Port     int
+	Users    Users
 }
 
-func (t *Transport) UnmarshalYAML(value *yaml.Node) error {
+func (e *EventBus) UnmarshalYAML(value *yaml.Node) error {
 	var raw struct {
-		Provider  string     `yaml:"provider"`
-		Host      string     `yaml:"host"`
-		Port      int        `yam:"port"`
-		Streams   []Stream   `yaml:"streams"`
-		Consumers []Consumer `yaml:"consumers"`
+		Provider string `yaml:"provider"`
+		Host     string `yaml:"host"`
+		Port     int    `yaml:"port"`
+		Users    Users  `yaml:"users"`
 	}
 
 	if err := value.Decode(&raw); err != nil {
@@ -194,13 +192,17 @@ func (t *Transport) UnmarshalYAML(value *yaml.Node) error {
 		return err
 	}
 
-	t.Provider = provider
-	t.Host = raw.Host
-	t.Port = raw.Port
-	t.Streams = raw.Streams
-	t.Consumers = raw.Consumers
+	e.Provider = provider
+	e.Host = raw.Host
+	e.Port = raw.Port
+	e.Users = raw.Users
 
 	return nil
+}
+
+type Users struct {
+	Stream   Stream
+	Consumer Consumer
 }
 
 type Stream struct {

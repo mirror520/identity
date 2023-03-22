@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -11,12 +12,32 @@ import (
 
 type natsTestSuite struct {
 	suite.Suite
+	cfg    conf.EventBus
 	pubSub pubsub.PubSub
 }
 
 func (suite *natsTestSuite) SetupSuite() {
-	cfg := &conf.Config{
-		Name: "identity-1",
+	cfg := conf.EventBus{
+		Provider: conf.NATS,
+		Host:     "localhost",
+		Port:     4222,
+		Users: conf.Users{
+			Stream: conf.Stream{
+				Name: "TESTS",
+				Config: []byte(`{
+					"subjects": [
+						"tests.>"
+					],
+					"retention": "interest",
+					"storage": "memory"
+				}`),
+			},
+			Consumer: conf.Consumer{
+				Name:   "test-1",
+				Stream: "TESTS",
+				Config: []byte(`{}`),
+			},
+		},
 	}
 
 	pubSub, err := NewPubSub(cfg)
@@ -25,27 +46,22 @@ func (suite *natsTestSuite) SetupSuite() {
 		return
 	}
 
-	jsonStr := `{
-		"subjects": [ 
-			"tests.>" 
-		],
-		"retention": "interest",
-		"storage": "memory"
-	}`
+	pullBasedPubSub, _ := pubSub.PullBasedPubSub()
 
-	pullBasedPubSub := pubSub.(pubsub.PullBasedPubSub)
-	if err := pullBasedPubSub.AddStream("TESTS", []byte(jsonStr)); err != nil {
+	stream := cfg.Users.Stream
+	if err := pullBasedPubSub.AddStream(stream.Name, stream.Config); err != nil {
 		suite.Fail(err.Error())
 		return
 	}
 
+	suite.cfg = cfg
 	suite.pubSub = pubSub
 }
 
 func (suite *natsTestSuite) TestPublishAndSubscribe() {
 	data := make(chan string, 1)
 
-	err := suite.pubSub.Subscribe("tests.>", func(msg *pubsub.Message) error {
+	err := suite.pubSub.Subscribe("tests.>", func(ctx context.Context, msg *pubsub.Message) error {
 		data <- string(msg.Data)
 		return nil
 	})
@@ -61,19 +77,19 @@ func (suite *natsTestSuite) TestPublishAndSubscribe() {
 }
 
 func (suite *natsTestSuite) TestPullSubscribe() {
-	pullBasedPubSub := suite.pubSub.(pubsub.PullBasedPubSub)
-	if err := pullBasedPubSub.AddConsumer("instance-1", "TESTS", []byte(`{}`)); err != nil {
+	pullBasedPubSub, _ := suite.pubSub.PullBasedPubSub()
+
+	stream := suite.cfg.Users.Stream
+	consumer := suite.cfg.Users.Consumer
+	if err := pullBasedPubSub.AddConsumer(consumer.Name, stream.Name, consumer.Config); err != nil {
 		suite.Fail(err.Error())
 		return
 	}
 
 	data := make(chan string, 1)
-
-	if err := pullBasedPubSub.PullSubscribe("instance-1", "TESTS", func(msg *pubsub.Message) error {
-
+	if err := pullBasedPubSub.PullSubscribe(consumer.Name, stream.Name, func(ctx context.Context, msg *pubsub.Message) error {
 		data <- string(msg.Data)
 		return nil
-
 	}); err != nil {
 		suite.Fail(err.Error())
 		return

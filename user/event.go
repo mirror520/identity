@@ -1,6 +1,7 @@
 package user
 
 import (
+	"strings"
 	"time"
 
 	"github.com/mirror520/identity/events"
@@ -46,6 +47,10 @@ func NewEvent(name EventName, u *User) *Event {
 
 func (e *Event) EventName() string {
 	return e.Name.String()
+}
+
+func (e *Event) Topic() string {
+	return strings.TrimPrefix(e.Name.String(), "user_")
 }
 
 type UserRegisteredEvent struct {

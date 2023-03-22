@@ -53,6 +53,8 @@ func (svc *service) Register(username string, name string, email string) (*user.
 	}
 
 	u := user.NewUser(username, name, email)
+	defer u.Notify()
+
 	return u, nil
 }
 
@@ -64,6 +66,7 @@ func (svc *service) OTPVerify(otp string, id user.UserID) (*user.User, error) {
 
 	// TODO: otp verify
 	u.Activate()
+	defer u.Notify()
 
 	return u, nil
 }
@@ -112,18 +115,14 @@ func (svc *service) signInWithGoogle(token string) (*user.User, error) {
 		u.AddSocialAccount(user.GOOGLE, socialID)
 		u.Activate()
 
-		err := svc.users.Store(u)
-		if err != nil {
-			return nil, err
-		}
+		defer u.Notify()
 	}
 
 	picture, ok := payload.Claims["picture"].(string)
-	if !ok {
-		return nil, ErrPictureNotFound
+	if ok {
+		u.Avatar = picture
 	}
 
-	u.Avatar = picture
 	return u, nil
 }
 
@@ -150,6 +149,8 @@ func (svc *service) AddSocialAccount(credential string, provider user.SocialProv
 	}
 
 	u.AddSocialAccount(provider, socialID)
+	defer u.Notify()
+
 	return u, nil
 }
 

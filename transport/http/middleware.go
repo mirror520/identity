@@ -34,7 +34,7 @@ func AuthMiddlware(authenticator Authenticator, cfg conf.Config) (*jwt.GinJWTMid
 		Authenticator: authenticator,
 
 		// 附加 JWT Payloads
-		PayloadFunc: func(data interface{}) jwt.MapClaims {
+		PayloadFunc: func(data any) jwt.MapClaims {
 			if v, ok := data.(*user.User); ok {
 				return jwt.MapClaims{
 					identityKey: v.Username,

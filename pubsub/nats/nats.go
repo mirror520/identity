@@ -19,7 +19,7 @@ type ConsumerStream struct {
 	Stream   string
 }
 
-func NewPubSub(cfg *conf.Config) (pubsub.PubSub, error) {
+func NewPubSub(cfg conf.EventBus) (pubsub.PubSub, error) {
 	log := zap.L().With(
 		zap.String("pubsub", "nats"),
 	)
@@ -52,6 +52,14 @@ func NewPubSub(cfg *conf.Config) (pubsub.PubSub, error) {
 	}, nil
 }
 
+func NewPullBasedPubSub(cfg conf.EventBus) (pubsub.PullBasedPubSub, error) {
+	pubSub, err := NewPubSub(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return pubSub.PullBasedPubSub()
+}
+
 type pubSub struct {
 	log           *zap.Logger
 	nc            *nats.Conn
@@ -71,10 +79,10 @@ func (ps *pubSub) Publish(topic string, data []byte) error {
 func (ps *pubSub) Subscribe(topic string, callback pubsub.MessageHandler) error {
 	sub, err := ps.js.Subscribe(topic, func(m *nats.Msg) {
 		msg := &pubsub.Message{
-			Header: m.Header,
-			Data:   m.Data,
+			Topic: m.Subject,
+			Data:  m.Data,
 		}
-		callback(msg)
+		callback(context.Background(), msg)
 	})
 
 	if err != nil {
@@ -85,6 +93,11 @@ func (ps *pubSub) Subscribe(topic string, callback pubsub.MessageHandler) error 
 	ps.subscriptions[topic] = sub
 	ps.Unlock()
 	return nil
+}
+
+func (ps *pubSub) PullBasedPubSub() (pubsub.PullBasedPubSub, error) {
+	var pullBasedPubSub pubsub.PullBasedPubSub = ps
+	return pullBasedPubSub, nil
 }
 
 func (ps *pubSub) AddStream(name string, raw json.RawMessage) error {
@@ -162,11 +175,11 @@ func (ps *pubSub) pull(ctx context.Context, sub *nats.Subscription, callback pub
 
 			for _, m := range msgs {
 				msg := &pubsub.Message{
-					Header: m.Header,
-					Data:   m.Data,
+					Topic: m.Subject,
+					Data:  m.Data,
 				}
 
-				err := callback(msg)
+				err := callback(context.Background(), msg)
 				if err != nil {
 					meta, err := m.Metadata()
 					if err != nil {
