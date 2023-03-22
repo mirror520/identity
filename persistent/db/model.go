@@ -43,13 +43,18 @@ func NewUser(u *user.User) *User {
 }
 
 func (u *User) reconstitute() *user.User {
+	id, err := user.ParseID(u.ID)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	accounts := make([]*user.SocialAccount, len(u.Accounts))
 	for i, a := range u.Accounts {
 		accounts[i] = a.reconstitute()
 	}
 
 	return &user.User{
-		ID:       user.NewID(u.ID),
+		ID:       id,
 		Username: u.Username,
 		Name:     u.Name,
 		Email:    u.Email,

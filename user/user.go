@@ -30,8 +30,12 @@ func MakeID() UserID {
 	return UserID(ulid.Make())
 }
 
-func NewID(id string) UserID {
-	return UserID(ulid.MustParse(id))
+func ParseID(id string) (UserID, error) {
+	userID, err := ulid.Parse(id)
+	if err != nil {
+		return UserID{}, err
+	}
+	return UserID(userID), nil
 }
 
 func (id UserID) Bytes() []byte {

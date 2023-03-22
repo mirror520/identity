@@ -66,6 +66,7 @@ func main() {
 	svc := identity.NewService(repo, cfg.Providers)
 	svc = identity.LoggingMiddleware(log)(svc)
 
+	// PATCH /signin
 	{
 		endpoint := identity.SignInEndpoint(svc)
 		authenticator := http.SignInAuthenticator(endpoint)
@@ -75,9 +76,28 @@ func main() {
 			return
 		}
 
-		r.PATCH("/login", authMiddleware.LoginHandler)
+		r.PATCH("/signin", authMiddleware.LoginHandler)
 	}
 
+	// POST /users
+	{
+		endpoint := identity.RegisterEndpoint(svc)
+		r.POST("/users", http.RegisterHandler(endpoint))
+	}
+
+	// PATCH /users/:id/verify
+	{
+		endpoint := identity.OTPVerifyEndpoint(svc)
+		r.POST("/users/:id/verify", http.OTPVerifyHandler(endpoint))
+	}
+
+	// PUT /users/id/socials
+	{
+		endpoint := identity.AddSocialAccountEndpoint(svc)
+		r.POST("/users/:id/socials", http.AddSocialAccountHandler(endpoint))
+	}
+
+	// SUB users.>
 	{
 		endpoint := identity.EventEndpoint(svc)
 		pubSub.PullSubscribe(consumer.Name, stream.Name, pubsub.EventHandler(endpoint))

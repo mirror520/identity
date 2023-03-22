@@ -15,19 +15,40 @@ type RegisterRequest struct {
 	Email    string
 }
 
-func RegisterHandler(svc Service) endpoint.Endpoint {
+func RegisterEndpoint(svc Service) endpoint.Endpoint {
 	return func(ctx context.Context, request any) (response any, err error) {
 		req, ok := request.(RegisterRequest)
 		if !ok {
 			return nil, errors.New("invalid request")
 		}
 
-		user, err := svc.Register(req.Username, req.Name, req.Email)
+		u, err := svc.Register(req.Username, req.Name, req.Email)
 		if err != nil {
 			return nil, err
 		}
 
-		return user, nil
+		return u, nil
+	}
+}
+
+type OTPVerifyRequest struct {
+	OTP    string
+	UserID user.UserID
+}
+
+func OTPVerifyEndpoint(svc Service) endpoint.Endpoint {
+	return func(ctx context.Context, request any) (response any, err error) {
+		req, ok := request.(OTPVerifyRequest)
+		if !ok {
+			return nil, errors.New("invalid request")
+		}
+
+		u, err := svc.OTPVerify(req.OTP, req.UserID)
+		if err != nil {
+			return nil, err
+		}
+
+		return u, nil
 	}
 }
 
@@ -43,12 +64,34 @@ func SignInEndpoint(svc Service) endpoint.Endpoint {
 			return nil, errors.New("invalid request")
 		}
 
-		user, err := svc.SignIn(req.Credential, req.Provider)
+		u, err := svc.SignIn(req.Credential, req.Provider)
 		if err != nil {
 			return nil, err
 		}
 
-		return user, nil
+		return u, nil
+	}
+}
+
+type AddSocialAccountRequest struct {
+	Credential string
+	Provider   user.SocialProvider
+	UserID     user.UserID
+}
+
+func AddSocialAccountEndpoint(svc Service) endpoint.Endpoint {
+	return func(ctx context.Context, request any) (response any, err error) {
+		req, ok := request.(AddSocialAccountRequest)
+		if !ok {
+			return nil, errors.New("invalid request")
+		}
+
+		u, err := svc.AddSocialAccount(req.Credential, req.Provider, req.UserID)
+		if err != nil {
+			return nil, err
+		}
+
+		return u, nil
 	}
 }
 
