@@ -113,7 +113,6 @@ func (svc *service) signInWithGoogle(token string) (*user.User, error) {
 
 		u = user.NewUser(username, name, email)
 		u.AddSocialAccount(user.GOOGLE, socialID)
-		u.Activate()
 
 		defer u.Notify()
 	}
@@ -171,12 +170,12 @@ func (svc *service) UserActivatedHandler(e *user.UserActivatedEvent) error {
 }
 
 func (svc *service) UserSocialAccountAddedHandler(e *user.UserSocialAccountAddedEvent) error {
-	u, err := svc.users.Find(e.Event.UserID)
+	u, err := svc.users.Find(e.UserID)
 	if err != nil {
 		return err
 	}
 
-	u.Accounts = append(u.Accounts, e.SocialAccount)
+	u.Accounts = append(u.Accounts, e.Account)
 	u.UpdatedAt = e.OccuredAt
 
 	return svc.users.Store(u)

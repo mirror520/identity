@@ -99,7 +99,6 @@ func (suite *identityTestSuite) TestSignInWithGoogle() {
 
 	suite.Equal(user.UserRegistered.String(), u.Events()[0].EventName())
 	suite.Equal(user.UserSocialAccountAdded.String(), u.Events()[1].EventName())
-	suite.Equal(user.UserActivated.String(), u.Events()[2].EventName())
 }
 
 func (suite *identityTestSuite) TearDownSuite() {

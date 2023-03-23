@@ -22,6 +22,7 @@ eventBus:
       name: USERS
       config: |
         {
+          "description": "identity:users",
           "subjects": [
             "users.>"
           ]
