@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 
 	"github.com/mirror520/identity"
@@ -27,15 +27,15 @@ func main() {
 		Usage: "manage user authentication and authorization",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:   "path",
-				Usage:  "work directory",
-				EnvVar: "IDENTITY_PATH",
+				Name:    "path",
+				Usage:   "work directory",
+				EnvVars: []string{"IDENTITY_PATH"},
 			},
 			&cli.IntFlag{
-				Name:   "port",
-				Usage:  "service port",
-				Value:  8080,
-				EnvVar: "IDENTITY_PORT",
+				Name:    "port",
+				Usage:   "service port",
+				Value:   8080,
+				EnvVars: []string{"IDENTITY_PORT"},
 			},
 		},
 		Action: run,
