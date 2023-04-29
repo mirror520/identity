@@ -1,0 +1,35 @@
+kind: pipeline
+type: docker
+name: build
+
+platform:
+  arch: amd64
+  os: linux
+
+steps:
+- name: build
+  image: golang:1.19
+  volumes:
+  - name: deps
+    path: /go
+  commands:
+  - go get
+  - go build
+
+- name: test
+  image: golang:1.19
+  volumes:
+  - name: deps
+    path: /go
+  commands:
+  - go test -v ./...
+
+volumes:
+- name: deps
+  temp: {}
+
+services:
+- name: nats
+  image: nats:2.9.16-alpine
+  commands: 
+  - --jetstream
