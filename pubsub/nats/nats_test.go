@@ -2,6 +2,7 @@ package nats
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -17,30 +18,36 @@ type natsTestSuite struct {
 }
 
 func (suite *natsTestSuite) SetupSuite() {
-	cfg := conf.EventBus{
-		Provider: conf.NATS,
-		Host:     "localhost",
-		Port:     4222,
-		Users: conf.Users{
-			Stream: conf.Stream{
-				Name: "TESTS",
-				Config: []byte(`{
+	path, ok := os.LookupEnv("IDENTITY_PATH")
+	if !ok {
+		path = ".."
+	}
+
+	cfg, err := conf.LoadConfig(path)
+	if err != nil {
+		suite.Fail(err.Error())
+		return
+	}
+
+	cfg.EventBus.Users = conf.Users{
+		Stream: conf.Stream{
+			Name: "TESTS",
+			Config: []byte(`{
 					"subjects": [
 						"tests.>"
 					],
 					"retention": "interest",
 					"storage": "memory"
 				}`),
-			},
-			Consumer: conf.Consumer{
-				Name:   "test-1",
-				Stream: "TESTS",
-				Config: []byte(`{}`),
-			},
+		},
+		Consumer: conf.Consumer{
+			Name:   "test-1",
+			Stream: "TESTS",
+			Config: []byte(`{}`),
 		},
 	}
 
-	pubSub, err := NewPubSub(cfg)
+	pubSub, err := NewPubSub(cfg.EventBus)
 	if err != nil {
 		suite.Fail(err.Error())
 		return
@@ -48,13 +55,13 @@ func (suite *natsTestSuite) SetupSuite() {
 
 	pullBasedPubSub, _ := pubSub.PullBasedPubSub()
 
-	stream := cfg.Users.Stream
+	stream := cfg.EventBus.Users.Stream
 	if err := pullBasedPubSub.AddStream(stream.Name, stream.Config); err != nil {
 		suite.Fail(err.Error())
 		return
 	}
 
-	suite.cfg = cfg
+	suite.cfg = cfg.EventBus
 	suite.pubSub = pubSub
 }
 
