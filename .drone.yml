@@ -31,4 +31,5 @@ volumes:
 services:
 - name: nats
   image: nats:2.9.16-alpine
-  commands: --jetstream
+  command:
+  - --jetstream
