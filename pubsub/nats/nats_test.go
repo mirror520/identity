@@ -20,7 +20,7 @@ type natsTestSuite struct {
 func (suite *natsTestSuite) SetupSuite() {
 	path, ok := os.LookupEnv("IDENTITY_PATH")
 	if !ok {
-		path = ".."
+		path = "../.."
 	}
 
 	cfg, err := conf.LoadConfig(path)
