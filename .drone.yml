@@ -6,6 +6,11 @@ platform:
   arch: amd64
   os: linux
 
+trigger:
+  event:
+  - push
+  - pull_request
+
 steps:
 - name: build
   image: golang:1.19
