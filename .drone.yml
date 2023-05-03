@@ -70,3 +70,64 @@ steps:
       from_secret: REGISTRY_USERNAME
     password: 
       from_secret: REGISTRY_PASSWORD
+
+---
+kind: pipeline
+type: docker
+name: release-linux-arm64
+
+platform:
+  arch: arm64
+  os: linux
+
+trigger:
+  event:
+  - tag
+
+steps:
+- name: build
+  image: golang:1.19-alpine3.17
+  commands:
+  - apk add gcc musl-dev
+  - go build -o release/linux/arm64/identity cmd/main.go
+
+- name: publish
+  image: plugins/docker
+  settings:
+    dockerfile: build/Dockerfile.linux.arm64
+    repo: mirror770109/identity
+    auto_tag: true
+    auto_tag_suffix: linux-arm64
+    username:
+      from_secret: REGISTRY_USERNAME
+    password: 
+      from_secret: REGISTRY_PASSWORD
+
+---
+kind: pipeline
+type: docker
+name: release-manifest
+
+platform:
+  arch: amd64
+  os: linux
+
+trigger:
+  event:
+  - tag
+
+steps:
+- name: publish
+  image: plugins/manifest
+  settings:
+    auto_tag: true
+    ignore_missing: true
+    spec: build/manifest.txt
+    username:
+      from_secret: REGISTRY_USERNAME
+    password: 
+      from_secret: REGISTRY_PASSWORD
+
+depends_on:
+  - release-linux-amd64
+  - release-linux-arm64
