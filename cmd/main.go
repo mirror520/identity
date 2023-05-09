@@ -100,6 +100,10 @@ func run(cli *cli.Context) error {
 	svc := identity.NewService(repo, cfg.Providers)
 	svc = identity.LoggingMiddleware(log)(svc)
 
+	r.GET("/health", func(ctx *gin.Context) {
+		ctx.JSON(200, "ok")
+	})
+
 	apiV1 := r.Group("/identity/v1")
 	{
 		// PATCH /signin
