@@ -132,11 +132,11 @@ steps:
   image: curlimages/curl:8.00.1
   commands:
   - >
-    curl --location 'https://api.github.com/repos/mirror520/charts/actions/workflows/$(WORKFLOW_ID)/dispatches'
-    --header 'Accept: application/vnd.github+json'
-    --header 'X-GitHub-Api-Version: 2022-11-28'
-    --header 'Content-Type: application/json'
-    --header 'Authorization: Bearer $(GITHUB_TOKEN)'
+    curl --location https://api.github.com/repos/mirror520/charts/actions/workflows/$WORKFLOW_ID/dispatches
+    --header "Accept: application/vnd.github+json"
+    --header "X-GitHub-Api-Version: 2022-11-28"
+    --header "Content-Type: application/json"
+    --header "Authorization: Bearer $GITHUB_TOKEN"
     --data '{
         "ref": "main",
         "inputs": {
