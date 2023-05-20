@@ -16,7 +16,7 @@ func TestLoadConfig(t *testing.T) {
 		return
 	}
 
-	assert.Equal("api.linyc.idv.tw", cfg.BaseURL)
+	assert.Equal("identity.linyc.idv.tw", cfg.BaseURL)
 
 	assert.Equal(1*time.Hour, cfg.JWT.Timeout)
 	assert.True(cfg.JWT.Refresh.Enabled)
