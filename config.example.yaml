@@ -1,6 +1,6 @@
 name: identity-1
 
-baseUrl: api.linyc.idv.tw
+baseUrl: identity.linyc.idv.tw
 
 jwt:
   secret: jwt_secret_key

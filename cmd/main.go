@@ -24,18 +24,18 @@ import (
 func main() {
 	app := &cli.App{
 		Name:  "identity",
-		Usage: "manage user authentication and authorization",
+		Usage: "Scalable and decentralized user identity management",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "path",
-				Usage:   "work directory",
+				Usage:   "Specifies the working directory for the identity microservice.",
 				EnvVars: []string{"IDENTITY_PATH"},
 			},
 			&cli.IntFlag{
 				Name:    "port",
-				Usage:   "service port",
+				Usage:   "Specifies the HTTP service port for the identity microservice.",
 				Value:   8080,
-				EnvVars: []string{"IDENTITY_PORT"},
+				EnvVars: []string{"IDENTITY_HTTP_PORT"},
 			},
 		},
 		Action: run,
