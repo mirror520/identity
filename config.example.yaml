@@ -1,4 +1,4 @@
-name: identity-1
+name: $INSTANCE_NAME
 
 baseUrl: identity.linyc.idv.tw
 
@@ -28,7 +28,7 @@ eventBus:
           ]
         }
     consumer:
-      name: identity-1
+      name: $INSTANCE_NAME
       stream: USERS
       config: |
         {

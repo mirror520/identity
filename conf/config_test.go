@@ -1,6 +1,7 @@
 package conf
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -10,12 +11,15 @@ import (
 func TestLoadConfig(t *testing.T) {
 	assert := assert.New(t)
 
+	os.Setenv("INSTANCE_NAME", "identity")
+
 	cfg, err := LoadConfig("..")
 	if err != nil {
 		assert.Fail(err.Error())
 		return
 	}
 
+	assert.Equal("identity", cfg.Name)
 	assert.Equal("identity.linyc.idv.tw", cfg.BaseURL)
 
 	assert.Equal(1*time.Hour, cfg.JWT.Timeout)

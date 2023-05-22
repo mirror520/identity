@@ -19,8 +19,10 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	defer f.Close()
 
+	r := NewEnvExpandedReader(f)
+
 	var cfg *Config
-	if err := yaml.NewDecoder(f).Decode(&cfg); err != nil {
+	if err := yaml.NewDecoder(r).Decode(&cfg); err != nil {
 		return nil, err
 	}
 
