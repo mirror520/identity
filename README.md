@@ -47,7 +47,7 @@ You can install Identity using one of the following methods:
 3. Copy the `config.yaml` file to the working directory. You can find an example configuration file in the project repository.
 
    ```shell
-   docker run -d -p 8080:8080 mirror520/identity:latest
+   docker run -d -p 8080:8080 mirror770109/identity:latest
    ```
 
    This command starts the Identity microservice in a Docker container, binds it to port 8080, and sets the `IDENTITY_PATH` and `IDENTITY_HTTP_PORT` environment variables. It also mounts the `config.yaml` file into the container at `/root/.identity/config.yaml`.
