@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
+	"strconv"
 	"sync"
 
 	"github.com/nats-io/nats.go"
@@ -21,14 +21,12 @@ type ConsumerStream struct {
 }
 
 func NewPubSub(cfg conf.EventBus) (pubsub.PubSub, error) {
+	url := "nats://" + cfg.Host + ":" + strconv.Itoa(cfg.Port)
+
 	log := zap.L().With(
 		zap.String("pubsub", "nats"),
+		zap.String("url", url),
 	)
-
-	url, ok := os.LookupEnv("NATS_URL")
-	if !ok {
-		url = nats.DefaultURL
-	}
 
 	nc, err := nats.Connect(url)
 	if err != nil {

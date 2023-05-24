@@ -1,0 +1,157 @@
+kind: pipeline
+type: docker
+name: build
+
+platform:
+  arch: amd64
+  os: linux
+
+trigger:
+  event:
+  - push
+  - pull_request
+
+steps:
+- name: build
+  image: golang:1.19
+  volumes:
+  - name: deps
+    path: /go
+  commands:
+  - go get ./...
+  - go build cmd/main.go
+
+- name: test
+  image: golang:1.19
+  volumes:
+  - name: deps
+    path: /go
+  commands:
+  - go test -v ./...
+
+volumes:
+- name: deps
+  temp: {}
+
+services:
+- name: nats
+  image: nats:2.9.16-alpine
+  command:
+  - --jetstream
+
+---
+kind: pipeline
+type: docker
+name: release-linux-amd64
+
+platform:
+  arch: amd64
+  os: linux
+
+trigger:
+  event:
+  - tag
+
+steps:
+- name: build
+  image: golang:1.19-alpine3.17
+  commands:
+  - apk add gcc musl-dev
+  - go build -o release/linux/amd64/identity cmd/main.go
+
+- name: publish
+  image: plugins/docker
+  settings:
+    dockerfile: build/Dockerfile.linux.amd64
+    repo: mirror770109/identity
+    auto_tag: true
+    auto_tag_suffix: linux-amd64
+    username:
+      from_secret: REGISTRY_USERNAME
+    password: 
+      from_secret: REGISTRY_PASSWORD
+
+---
+kind: pipeline
+type: docker
+name: release-linux-arm64
+
+platform:
+  arch: arm64
+  os: linux
+
+trigger:
+  event:
+  - tag
+
+steps:
+- name: build
+  image: golang:1.19-alpine3.17
+  commands:
+  - apk add gcc musl-dev
+  - go build -o release/linux/arm64/identity cmd/main.go
+
+- name: publish
+  image: plugins/docker
+  settings:
+    dockerfile: build/Dockerfile.linux.arm64
+    repo: mirror770109/identity
+    auto_tag: true
+    auto_tag_suffix: linux-arm64
+    username:
+      from_secret: REGISTRY_USERNAME
+    password: 
+      from_secret: REGISTRY_PASSWORD
+
+---
+kind: pipeline
+type: docker
+name: release-manifest
+
+platform:
+  arch: amd64
+  os: linux
+
+trigger:
+  event:
+  - tag
+
+steps:
+- name: publish
+  image: plugins/manifest
+  settings:
+    auto_tag: true
+    ignore_missing: true
+    spec: build/manifest.txt
+    username:
+      from_secret: REGISTRY_USERNAME
+    password: 
+      from_secret: REGISTRY_PASSWORD
+
+- name: update-charts
+  image: curlimages/curl:8.00.1
+  commands:
+  - >
+    curl --location https://api.github.com/repos/mirror520/charts/actions/workflows/$WORKFLOW_ID/dispatches
+    --header "Accept: application/vnd.github+json"
+    --header "X-GitHub-Api-Version: 2022-11-28"
+    --header "Content-Type: application/json"
+    --header "Authorization: Bearer $GITHUB_TOKEN"
+    --data '{
+        "ref": "main",
+        "inputs": {
+            "target_chart": "${DRONE_REPO_NAME}",
+            "app_version": "${DRONE_TAG##v}",
+            "message": "${DRONE_REPO} has released ${DRONE_TAG}"
+        }
+    }'
+  environment:
+    WORKFLOW_ID:
+      from_secret: WORKFLOW_ID
+    GITHUB_TOKEN:
+      from_secret: GITHUB_TOKEN
+      
+
+depends_on:
+  - release-linux-amd64
+  - release-linux-arm64
