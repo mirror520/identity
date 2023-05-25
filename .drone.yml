@@ -141,7 +141,7 @@ steps:
         "ref": "main",
         "inputs": {
             "target_chart": "${DRONE_REPO_NAME}",
-            "app_version": "${DRONE_TAG##v}",
+            "app_version": "${DRONE_TAG}",
             "message": "${DRONE_REPO} has released ${DRONE_TAG}"
         }
     }'
