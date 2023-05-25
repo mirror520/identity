@@ -29,7 +29,7 @@ You can install Identity using one of the following methods:
    cd identity
    
    # build and install
-   go install
+   go build -o $GOPATH/bin/identity cmd/main.go
    ```
 
 2. Copy the `config.yaml` file to the working directory. You can find an example configuration file in the project repository.
