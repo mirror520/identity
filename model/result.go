@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type ResultStatus string
 
@@ -14,6 +17,10 @@ type Result struct {
 	Msg    string       `json:"msg"`
 	Data   any          `json:"data"`
 	Time   time.Time    `json:"time"`
+}
+
+func (r *Result) Bytes() ([]byte, error) {
+	return json.Marshal(&r)
 }
 
 func SuccessResult(msg string) *Result {

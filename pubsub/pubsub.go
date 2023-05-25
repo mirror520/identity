@@ -22,7 +22,10 @@ type PullBasedPubSub interface {
 
 type MessageHandler func(ctx context.Context, msg *Message) error
 
+type MessageResponse func(data []byte) error
+
 type Message struct {
-	Topic string
-	Data  []byte
+	Topic    string
+	Data     []byte
+	Response MessageResponse
 }

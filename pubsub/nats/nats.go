@@ -71,15 +71,15 @@ type pubSub struct {
 }
 
 func (ps *pubSub) Publish(topic string, data []byte) error {
-	_, err := ps.js.Publish(topic, data)
-	return err
+	return ps.nc.Publish(topic, data)
 }
 
 func (ps *pubSub) Subscribe(topic string, callback pubsub.MessageHandler) error {
-	sub, err := ps.js.Subscribe(topic, func(m *nats.Msg) {
+	sub, err := ps.nc.Subscribe(topic, func(m *nats.Msg) {
 		msg := &pubsub.Message{
-			Topic: m.Subject,
-			Data:  m.Data,
+			Topic:    m.Subject,
+			Data:     m.Data,
+			Response: m.Respond,
 		}
 		callback(context.Background(), msg)
 	})

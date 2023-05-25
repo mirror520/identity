@@ -8,6 +8,8 @@ import (
 
 	"github.com/go-kit/kit/endpoint"
 
+	"github.com/mirror520/identity"
+	"github.com/mirror520/identity/model"
 	"github.com/mirror520/identity/pubsub"
 	"github.com/mirror520/identity/user"
 )
@@ -50,5 +52,40 @@ func EventHandler(endpoint endpoint.Endpoint) pubsub.MessageHandler {
 
 		_, err := endpoint(ctx, event)
 		return err
+	}
+}
+
+func SignInHandler(endpoint endpoint.Endpoint) pubsub.MessageHandler {
+	return func(ctx context.Context, msg *pubsub.Message) error {
+		var req identity.SignInRequest
+
+		if err := json.Unmarshal(msg.Data, &req); err != nil {
+			result := model.FailureResult(err)
+			bs, err := result.Bytes()
+			if err != nil {
+				return err
+			}
+			return msg.Response(bs)
+		}
+
+		resp, err := endpoint(ctx, req)
+		if err != nil {
+			result := model.FailureResult(err)
+			bs, err := result.Bytes()
+			if err != nil {
+				return err
+			}
+			return msg.Response(bs)
+		}
+
+		result := model.SuccessResult("user signed in")
+		result.Data = resp
+
+		bs, err := result.Bytes()
+		if err != nil {
+			return err
+		}
+
+		return msg.Response(bs)
 	}
 }

@@ -116,6 +116,7 @@ func run(cli *cli.Context) error {
 			}
 
 			apiV1.PATCH("/signin", authMiddleware.LoginHandler)
+			pubSub.Subscribe("identity.signin", pubsub.SignInHandler(endpoint))
 		}
 
 		// POST /users
