@@ -36,6 +36,8 @@ func LoadConfig(path string) (*Config, error) {
 
 type Config struct {
 	Name       string     `yaml:"name"`
+	Address    string     `yaml:"address"`
+	Port       int        `yaml:"-"`
 	BaseURL    string     `yaml:"baseUrl"`
 	JWT        JWT        `yaml:"jwt"`
 	Persistent Persistent `yaml:"persistent"`
@@ -118,6 +120,19 @@ func ParsePersistentDriver(driver string) (PersistentDriver, error) {
 		return InMem, nil
 	default:
 		return -1, errors.New("driver not supported")
+	}
+}
+
+func (driver PersistentDriver) String() string {
+	switch driver {
+	case SQLite:
+		return "sqlite"
+	case BadgerDB:
+		return "badger"
+	case InMem:
+		return "inmem"
+	default:
+		return "unknwon"
 	}
 }
 

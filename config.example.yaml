@@ -1,4 +1,5 @@
 name: $INSTANCE_NAME
+address: localhost
 
 baseUrl: identity.linyc.idv.tw
 

@@ -12,6 +12,8 @@ import (
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 
+	consul "github.com/hashicorp/consul/api"
+
 	"github.com/mirror520/identity"
 	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/events"
@@ -61,6 +63,7 @@ func run(cli *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	cfg.Port = cli.Int("port")
 
 	log, err := zap.NewDevelopment()
 	if err != nil {
@@ -70,8 +73,11 @@ func run(cli *cli.Context) error {
 
 	zap.ReplaceGlobals(log)
 
+	log = log.With(zap.String("action", "main"))
+
 	pubSub, err := nats.NewPullBasedPubSub(cfg.EventBus)
 	if err != nil {
+		log.Error(err.Error(), zap.String("infra", "nats"))
 		return err
 	}
 	defer pubSub.Close()
@@ -80,16 +86,31 @@ func run(cli *cli.Context) error {
 
 	stream := cfg.EventBus.Users.Stream
 	if err := pubSub.AddStream(stream.Name, stream.Config); err != nil {
+		log.Error(err.Error(),
+			zap.String("infra", "nats"),
+			zap.String("phase", "add_stream"),
+			zap.String("stream", stream.Name),
+		)
 		return err
 	}
 
 	consumer := cfg.EventBus.Users.Consumer
 	if err := pubSub.AddConsumer(consumer.Name, stream.Name, consumer.Config); err != nil {
+		log.Error(err.Error(),
+			zap.String("infra", "nats"),
+			zap.String("phase", "add_consumer"),
+			zap.String("stream", stream.Name),
+			zap.String("consumer", consumer.Name),
+		)
 		return err
 	}
 
 	repo, err := persistent.NewUserRepository(cfg.Persistent)
 	if err != nil {
+		log.Error(err.Error(),
+			zap.String("infra", "persistent"),
+			zap.String("driver", cfg.Persistent.Driver.String()),
+		)
 		return err
 	}
 	defer repo.Close()
@@ -116,7 +137,9 @@ func run(cli *cli.Context) error {
 			}
 
 			apiV1.PATCH("/signin", authMiddleware.LoginHandler)
-			pubSub.Subscribe("identity.signin", pubsub.SignInHandler(endpoint))
+
+			pubSub.Subscribe("identity.signin", pubsub.SignInHandler(endpoint))              // NATS LB
+			pubSub.Subscribe("identity."+cfg.Name+".signin", pubsub.SignInHandler(endpoint)) // NATS Direct
 		}
 
 		// POST /users
@@ -147,6 +170,13 @@ func run(cli *cli.Context) error {
 	port := cli.Int("port")
 	go r.Run(":" + strconv.Itoa(port))
 
+	// Service Registry
+	if err := Registry(cfg, port); err != nil {
+		log.Error(err.Error(), zap.String("phase", "service_registry"))
+	} else {
+		defer client.Agent().ServiceDeregister(cfg.Name)
+	}
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
@@ -154,4 +184,39 @@ func run(cli *cli.Context) error {
 	log.Info(sign.String())
 
 	return nil
+}
+
+var client *consul.Client
+
+func Registry(cfg *conf.Config, port int) error {
+	consulCfg := consul.DefaultConfig()
+
+	c, err := consul.NewClient(consulCfg)
+	if err != nil {
+		return err
+	}
+	client = c
+
+	service := &consul.AgentServiceRegistration{
+		ID:      cfg.Name,
+		Name:    "identity",
+		Tags:    []string{"http", "nats"},
+		Port:    port,
+		Address: cfg.Address,
+		TaggedAddresses: map[string]consul.ServiceAddress{
+			"http": {Address: cfg.Address, Port: port},
+			"nats": {Address: cfg.EventBus.Host, Port: cfg.EventBus.Port},
+		},
+		Meta: map[string]string{
+			"nats_request_prefix": "identity." + cfg.Name,
+		},
+		Check: &consul.AgentServiceCheck{
+			Interval:                       "10s",
+			Timeout:                        "1s",
+			HTTP:                           "http://" + cfg.Address + ":" + strconv.Itoa(port) + "/health",
+			DeregisterCriticalServiceAfter: "60s",
+		},
+	}
+
+	return client.Agent().ServiceRegister(service)
 }
