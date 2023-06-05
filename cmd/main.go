@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -46,6 +48,8 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
+
+	time.Sleep(3000 * time.Millisecond)
 }
 
 func run(cli *cli.Context) error {
@@ -167,15 +171,12 @@ func run(cli *cli.Context) error {
 		pubSub.PullSubscribe(consumer.Name, stream.Name, pubsub.EventHandler(endpoint))
 	}
 
-	port := cli.Int("port")
-	go r.Run(":" + strconv.Itoa(port))
+	go r.Run(":" + strconv.Itoa(cfg.Port))
 
-	// Service Registry
-	if err := Registry(cfg, port); err != nil {
-		log.Error(err.Error(), zap.String("phase", "service_registry"))
-	} else {
-		defer client.Agent().ServiceDeregister(cfg.Name)
-	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go Registry(ctx, cfg)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -186,25 +187,37 @@ func run(cli *cli.Context) error {
 	return nil
 }
 
-var client *consul.Client
+func Registry(ctx context.Context, cfg *conf.Config) {
+	log := zap.L().With(
+		zap.String("action", "service_registry"),
+	)
 
-func Registry(cfg *conf.Config, port int) error {
 	consulCfg := consul.DefaultConfig()
 
-	c, err := consul.NewClient(consulCfg)
+	client, err := consul.NewClient(consulCfg)
 	if err != nil {
-		return err
+		log.Error(err.Error())
+		return
 	}
-	client = c
+
+	scheme := "http"
+	address := "localhost"
+	port := cfg.Port
+
+	if cfg.ExternalProxy != nil {
+		scheme = cfg.ExternalProxy.Scheme
+		address = cfg.ExternalProxy.Address
+		port = cfg.ExternalProxy.Port
+	}
 
 	service := &consul.AgentServiceRegistration{
 		ID:      cfg.Name,
 		Name:    "identity",
-		Tags:    []string{"http", "nats"},
+		Tags:    []string{scheme, "nats"},
 		Port:    port,
-		Address: cfg.Address,
+		Address: address,
 		TaggedAddresses: map[string]consul.ServiceAddress{
-			"http": {Address: cfg.Address, Port: port},
+			scheme: {Address: address, Port: port},
 			"nats": {Address: cfg.EventBus.Host, Port: cfg.EventBus.Port},
 		},
 		Meta: map[string]string{
@@ -213,10 +226,35 @@ func Registry(cfg *conf.Config, port int) error {
 		Check: &consul.AgentServiceCheck{
 			Interval:                       "10s",
 			Timeout:                        "1s",
-			HTTP:                           "http://" + cfg.Address + ":" + strconv.Itoa(port) + "/health",
+			HTTP:                           scheme + "://" + address + ":" + strconv.Itoa(port) + "/health",
 			DeregisterCriticalServiceAfter: "60s",
 		},
 	}
 
-	return client.Agent().ServiceRegister(service)
+	ticker := time.NewTicker(30 * time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			err := client.Agent().ServiceDeregister(service.ID)
+			if err != nil {
+				log.Error(err.Error())
+				return
+			}
+
+			log.Info("done")
+			return
+
+		case <-ticker.C:
+			_, _, err := client.Agent().Service(service.ID, nil)
+			if err != nil {
+				err = client.Agent().ServiceRegister(service)
+				if err != nil {
+					log.Error(err.Error())
+					continue
+				}
+
+				log.Info("service registration")
+			}
+		}
+	}
 }

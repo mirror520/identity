@@ -1,5 +1,9 @@
 name: $INSTANCE_NAME
-address: localhost
+
+# external:
+#   scheme: http
+#   address: identity.mirror520.svc.cluster.local
+#   port: 80
 
 baseUrl: identity.linyc.idv.tw
 

@@ -35,15 +35,22 @@ func LoadConfig(path string) (*Config, error) {
 }
 
 type Config struct {
-	Name       string     `yaml:"name"`
-	Address    string     `yaml:"address"`
-	Port       int        `yaml:"-"`
-	BaseURL    string     `yaml:"baseUrl"`
-	JWT        JWT        `yaml:"jwt"`
-	Persistent Persistent `yaml:"persistent"`
-	EventBus   EventBus   `yaml:"eventBus"`
-	Providers  Providers  `yaml:"providers"`
-	Test       Test       `yaml:"test"`
+	Name          string         `yaml:"name"`
+	Address       string         `yaml:"address"`
+	Port          int            `yaml:"-"`
+	ExternalProxy *ExternalProxy `yaml:"external"`
+	BaseURL       string         `yaml:"baseUrl"`
+	JWT           JWT            `yaml:"jwt"`
+	Persistent    Persistent     `yaml:"persistent"`
+	EventBus      EventBus       `yaml:"eventBus"`
+	Providers     Providers      `yaml:"providers"`
+	Test          Test           `yaml:"test"`
+}
+
+type ExternalProxy struct {
+	Scheme  string `yaml:"scheme"`
+	Address string `yaml:"address"`
+	Port    int    `yaml:"port"`
 }
 
 type JWT struct {
