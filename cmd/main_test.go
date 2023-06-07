@@ -3,13 +3,56 @@ package main
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+
+	consul "github.com/hashicorp/consul/api"
 
 	"github.com/mirror520/identity"
 	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/persistent/db"
 	"github.com/mirror520/identity/user"
 )
+
+func TestServiceDiscovery(t *testing.T) {
+	assert := assert.New(t)
+
+	cfg := consul.DefaultConfig()
+
+	client, err := consul.NewClient(cfg)
+	if err != nil {
+		assert.Fail(err.Error())
+		return
+	}
+
+	session, _, err := client.Session().Create(&consul.SessionEntry{
+		TTL: "60s",
+	}, nil)
+	if err != nil {
+		assert.Fail(err.Error())
+		return
+	}
+
+	query, _, err := client.PreparedQuery().Create(&consul.PreparedQueryDefinition{
+		Session: session,
+		Service: consul.ServiceQuery{
+			Service: "identity",
+			Tags:    []string{"nats"},
+		},
+	}, nil)
+	if err != nil {
+		assert.Fail(err.Error())
+		return
+	}
+
+	resp, _, err := client.PreparedQuery().Execute(query, nil)
+	if err != nil {
+		assert.Fail(err.Error())
+		return
+	}
+
+	assert.Len(resp.Nodes, 4)
+}
 
 type identityTestSuite struct {
 	suite.Suite

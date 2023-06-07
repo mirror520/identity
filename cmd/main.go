@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -25,10 +26,23 @@ import (
 	"github.com/mirror520/identity/transport/pubsub"
 )
 
+var (
+	Version   string
+	BuildTime string
+	GitCommit string
+)
+
 func main() {
+	cli.VersionPrinter = func(cli *cli.Context) {
+		fmt.Println("Version: " + cli.App.Version)
+		fmt.Println("BuildTime: " + BuildTime)
+		fmt.Println("GitCommit: " + GitCommit)
+	}
+
 	app := &cli.App{
-		Name:  "identity",
-		Usage: "Scalable and decentralized user identity management",
+		Name:    "identity",
+		Usage:   "Scalable and decentralized user identity management",
+		Version: Version,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "path",
@@ -142,8 +156,10 @@ func run(cli *cli.Context) error {
 
 			apiV1.PATCH("/signin", authMiddleware.LoginHandler)
 
-			pubSub.Subscribe("identity.signin", pubsub.SignInHandler(endpoint))              // NATS LB
-			pubSub.Subscribe("identity."+cfg.Name+".signin", pubsub.SignInHandler(endpoint)) // NATS Direct
+			if cfg.Transport.NATS.Enabled {
+				pubSub.Subscribe("identity.signin", pubsub.SignInHandler(endpoint))                      // NATS LB
+				pubSub.Subscribe(cfg.Transport.NATS.ReqPrefix+".signin", pubsub.SignInHandler(endpoint)) // NATS Direct
+			}
 		}
 
 		// POST /users
@@ -192,20 +208,18 @@ func Registry(ctx context.Context, cfg *conf.Config) {
 		zap.String("action", "service_registry"),
 	)
 
-	consulCfg := consul.DefaultConfig()
-
-	client, err := consul.NewClient(consulCfg)
+	client, err := consul.NewClient(consul.DefaultConfig())
 	if err != nil {
 		log.Error(err.Error())
 		return
 	}
 
-	scheme := "http"
+	http := "http"
 	address := "localhost"
 	port := cfg.Port
 
 	if cfg.ExternalProxy != nil {
-		scheme = cfg.ExternalProxy.Scheme
+		http = cfg.ExternalProxy.Scheme
 		address = cfg.ExternalProxy.Address
 		port = cfg.ExternalProxy.Port
 	}
@@ -213,22 +227,36 @@ func Registry(ctx context.Context, cfg *conf.Config) {
 	service := &consul.AgentServiceRegistration{
 		ID:      cfg.Name,
 		Name:    "identity",
-		Tags:    []string{scheme, "nats"},
+		Tags:    []string{http},
 		Port:    port,
 		Address: address,
 		TaggedAddresses: map[string]consul.ServiceAddress{
-			scheme: {Address: address, Port: port},
-			"nats": {Address: cfg.EventBus.Host, Port: cfg.EventBus.Port},
+			http: {Address: address, Port: port},
 		},
-		Meta: map[string]string{
-			"nats_request_prefix": "identity." + cfg.Name,
-		},
+		Meta: make(map[string]string),
 		Check: &consul.AgentServiceCheck{
 			Interval:                       "10s",
 			Timeout:                        "1s",
-			HTTP:                           scheme + "://" + address + ":" + strconv.Itoa(port) + "/health",
+			HTTP:                           http + "://" + address + ":" + strconv.Itoa(port) + "/health",
 			DeregisterCriticalServiceAfter: "60s",
 		},
+	}
+
+	if cfg.Transport.NATS.Enabled {
+		service.Tags = append(service.Tags, "nats")
+		service.TaggedAddresses["nats"] = consul.ServiceAddress{
+			Address: cfg.EventBus.Host,
+			Port:    cfg.EventBus.Port,
+		}
+		service.Meta["nats_request_prefix"] = cfg.Transport.NATS.ReqPrefix
+	}
+
+	if cfg.Transport.LoadBalancing.Enabled {
+		service.Tags = append(service.Tags, "lb")
+	}
+
+	if Version != "" {
+		service.Tags = append(service.Tags, Version)
 	}
 
 	ticker := time.NewTicker(30 * time.Second)

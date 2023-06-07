@@ -14,6 +14,13 @@ jwt:
     enabled: true
     maximum: 1h30m
 
+transport:
+  nats:
+    enabled: true
+    reqPrefix: identity.$INSTANCE_NAME
+  loadBalancing:
+    enabled: false
+
 persistent:
   driver: badger
   name: users

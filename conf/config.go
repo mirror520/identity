@@ -41,6 +41,7 @@ type Config struct {
 	ExternalProxy *ExternalProxy `yaml:"external"`
 	BaseURL       string         `yaml:"baseUrl"`
 	JWT           JWT            `yaml:"jwt"`
+	Transport     Transport      `yaml:"transport"`
 	Persistent    Persistent     `yaml:"persistent"`
 	EventBus      EventBus       `yaml:"eventBus"`
 	Providers     Providers      `yaml:"providers"`
@@ -107,6 +108,16 @@ func (cfg *JWT) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	return nil
+}
+
+type Transport struct {
+	NATS struct {
+		Enabled   bool   `yaml:"enabled"`
+		ReqPrefix string `yaml:"reqPrefix"`
+	} `yaml:"nats"`
+	LoadBalancing struct {
+		Enabled bool `yaml:"enabled"`
+	} `yaml:"loadBalancing"`
 }
 
 type PersistentDriver int

@@ -57,7 +57,10 @@ steps:
   image: golang:1.19-alpine3.17
   commands:
   - apk add gcc musl-dev
-  - go build -o release/linux/amd64/identity cmd/main.go
+  - go build -ldflags "-X main.Version=$(git describe --tags) 
+                       -X main.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+                       -X main.GitCommit=$(git rev-parse HEAD)" \
+             -o release/linux/amd64/identity cmd/main.go
 
 - name: publish
   image: plugins/docker
@@ -89,7 +92,10 @@ steps:
   image: golang:1.19-alpine3.17
   commands:
   - apk add gcc musl-dev
-  - go build -o release/linux/arm64/identity cmd/main.go
+  - go build -ldflags "-X identity.Version=$(git describe --tags) 
+                       -X identity.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+                       -X identity.GitCommit=$(git rev-parse HEAD)" \
+             -o release/linux/arm64/identity cmd/main.go
 
 - name: publish
   image: plugins/docker
