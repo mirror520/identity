@@ -92,14 +92,22 @@ func (mw *loggingMiddleware) AddSocialAccount(credential string, provider user.S
 	return u, nil
 }
 
+func (mw *loggingMiddleware) Handler() (EventHandler, error) {
+	return mw, nil
+}
+
 func (mw *loggingMiddleware) UserRegisteredHandler(e *user.UserRegisteredEvent) error {
 	log := mw.log.With(
 		zap.String("event", e.EventName()),
 		zap.String("user_id", e.UserID.String()),
 	)
 
-	err := mw.next.UserRegisteredHandler(e)
+	handler, err := mw.next.Handler()
 	if err != nil {
+		return err
+	}
+
+	if err := handler.UserRegisteredHandler(e); err != nil {
 		log.Error(err.Error())
 	}
 
@@ -113,8 +121,12 @@ func (mw *loggingMiddleware) UserActivatedHandler(e *user.UserActivatedEvent) er
 		zap.String("user_id", e.UserID.String()),
 	)
 
-	err := mw.next.UserActivatedHandler(e)
+	handler, err := mw.next.Handler()
 	if err != nil {
+		return err
+	}
+
+	if err := handler.UserActivatedHandler(e); err != nil {
 		log.Error(err.Error())
 	}
 
@@ -128,8 +140,12 @@ func (mw *loggingMiddleware) UserSocialAccountAddedHandler(e *user.UserSocialAcc
 		zap.String("user_id", e.Event.UserID.String()),
 	)
 
-	err := mw.next.UserSocialAccountAddedHandler(e)
+	handler, err := mw.next.Handler()
 	if err != nil {
+		return err
+	}
+
+	if err := handler.UserSocialAccountAddedHandler(e); err != nil {
 		log.Error(err.Error())
 	}
 
