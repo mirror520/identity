@@ -56,7 +56,8 @@ steps:
 - name: build
   image: golang:1.19-alpine3.17
   commands:
-  - apk add gcc musl-dev
+  - apk add gcc musl-dev git
+  - git config --global --add safe.directory $(pwd)
   - go build -ldflags "-X main.Version=$(git describe --tags) 
                        -X main.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
                        -X main.GitCommit=$(git rev-parse HEAD)" \
@@ -91,7 +92,8 @@ steps:
 - name: build
   image: golang:1.19-alpine3.17
   commands:
-  - apk add gcc musl-dev
+  - apk add gcc musl-dev git
+  - git config --global --add safe.directory $(pwd)
   - go build -ldflags "-X identity.Version=$(git describe --tags) 
                        -X identity.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
                        -X identity.GitCommit=$(git rev-parse HEAD)" \
