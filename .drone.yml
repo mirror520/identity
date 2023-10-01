@@ -60,7 +60,7 @@ steps:
   - git config --global --add safe.directory $(pwd)
   - go build -ldflags "-X main.Version=$(git describe --tags) 
                        -X main.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-                       -X main.GitCommit=$(git rev-parse HEAD)" \
+                       -X main.GitCommit=$(git rev-parse HEAD)" 
              -o release/linux/amd64/identity cmd/main.go
 
 - name: publish
@@ -96,7 +96,7 @@ steps:
   - git config --global --add safe.directory $(pwd)
   - go build -ldflags "-X identity.Version=$(git describe --tags) 
                        -X identity.BuildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-                       -X identity.GitCommit=$(git rev-parse HEAD)" \
+                       -X identity.GitCommit=$(git rev-parse HEAD)" 
              -o release/linux/arm64/identity cmd/main.go
 
 - name: publish
