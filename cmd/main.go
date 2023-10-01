@@ -20,8 +20,10 @@ import (
 	"github.com/mirror520/identity"
 	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/events"
-	"github.com/mirror520/identity/persistent"
+	"github.com/mirror520/identity/model"
+	"github.com/mirror520/identity/persistence"
 	"github.com/mirror520/identity/pubsub/nats"
+	"github.com/mirror520/identity/transport"
 	"github.com/mirror520/identity/transport/http"
 	"github.com/mirror520/identity/transport/pubsub"
 )
@@ -46,12 +48,12 @@ func main() {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "path",
-				Usage:   "Specifies the working directory for the identity microservice.",
+				Usage:   "Specifies the working directory",
 				EnvVars: []string{"IDENTITY_PATH"},
 			},
 			&cli.IntFlag{
 				Name:    "port",
-				Usage:   "Specifies the HTTP service port for the identity microservice.",
+				Usage:   "Specifies the HTTP service port",
 				Value:   8080,
 				EnvVars: []string{"IDENTITY_HTTP_PORT"},
 			},
@@ -91,11 +93,13 @@ func run(cli *cli.Context) error {
 
 	zap.ReplaceGlobals(log)
 
-	log = log.With(zap.String("action", "main"))
-
+	// Add PubSub
 	pubSub, err := nats.NewPullBasedPubSub(cfg.EventBus)
 	if err != nil {
-		log.Error(err.Error(), zap.String("infra", "nats"))
+		log.Error(err.Error(),
+			zap.String("infra", "pubsub"),
+			zap.String("provider", cfg.EventBus.Provider.String()),
+		)
 		return err
 	}
 	defer pubSub.Close()
@@ -105,7 +109,8 @@ func run(cli *cli.Context) error {
 	stream := cfg.EventBus.Users.Stream
 	if err := pubSub.AddStream(stream.Name, stream.Config); err != nil {
 		log.Error(err.Error(),
-			zap.String("infra", "nats"),
+			zap.String("infra", "pubsub"),
+			zap.String("provider", cfg.EventBus.Provider.String()),
 			zap.String("phase", "add_stream"),
 			zap.String("stream", stream.Name),
 		)
@@ -115,7 +120,8 @@ func run(cli *cli.Context) error {
 	consumer := cfg.EventBus.Users.Consumer
 	if err := pubSub.AddConsumer(consumer.Name, stream.Name, consumer.Config); err != nil {
 		log.Error(err.Error(),
-			zap.String("infra", "nats"),
+			zap.String("infra", "pubsub"),
+			zap.String("provider", cfg.EventBus.Provider.String()),
 			zap.String("phase", "add_consumer"),
 			zap.String("stream", stream.Name),
 			zap.String("consumer", consumer.Name),
@@ -123,21 +129,35 @@ func run(cli *cli.Context) error {
 		return err
 	}
 
-	repo, err := persistent.NewUserRepository(cfg.Persistent)
+	// Add Persistence
+	repo, err := persistence.NewUserRepository(cfg.Persistence)
 	if err != nil {
 		log.Error(err.Error(),
-			zap.String("infra", "persistent"),
-			zap.String("driver", cfg.Persistent.Driver.String()),
+			zap.String("infra", "persistence"),
+			zap.String("driver", cfg.Persistence.Driver.String()),
 		)
 		return err
 	}
 	defer repo.Close()
 
+	ctx := context.WithValue(context.Background(), model.LOGGER, log)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Add Service and Middlewares
+	svc := identity.NewService(repo, cfg.Providers)
+
+	if cfg.Transport.LoadBalancing.Enabled {
+		ch := make(chan identity.Instance, 1)
+		svc = identity.ProxyingMiddleware(ctx, ch)(svc)
+
+		go Discovery(ctx, ch, cfg)
+	}
+
+	svc = identity.LoggingMiddleware(log)(svc)
+
 	r := gin.Default()
 	r.Use(cors.Default())
-
-	svc := identity.NewService(repo, cfg.Providers)
-	svc = identity.LoggingMiddleware(log)(svc)
 
 	r.GET("/health", func(ctx *gin.Context) {
 		ctx.JSON(200, "ok")
@@ -148,12 +168,14 @@ func run(cli *cli.Context) error {
 		// PATCH /signin
 		{
 			endpoint := identity.SignInEndpoint(svc)
+
 			authenticator := http.SignInAuthenticator(endpoint)
 			authMiddleware, err := http.AuthMiddlware(authenticator, *cfg)
 			if err != nil {
 				return err
 			}
 
+			// TODO: change GinJWTMiddleware to Endpoint
 			apiV1.PATCH("/signin", authMiddleware.LoginHandler)
 
 			if cfg.Transport.NATS.Enabled {
@@ -189,9 +211,6 @@ func run(cli *cli.Context) error {
 
 	go r.Run(":" + strconv.Itoa(cfg.Port))
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	go Registry(ctx, cfg)
 
 	quit := make(chan os.Signal, 1)
@@ -204,9 +223,11 @@ func run(cli *cli.Context) error {
 }
 
 func Registry(ctx context.Context, cfg *conf.Config) {
-	log := zap.L().With(
-		zap.String("action", "service_registry"),
-	)
+	log, ok := ctx.Value(model.LOGGER).(*zap.Logger)
+	if !ok {
+		log = zap.L()
+	}
+	log = log.With(zap.String("action", "service_registry"))
 
 	client, err := consul.NewClient(consul.DefaultConfig())
 	if err != nil {
@@ -283,6 +304,136 @@ func Registry(ctx context.Context, cfg *conf.Config) {
 
 				log.Info("service registration")
 			}
+		}
+	}
+}
+
+func Discovery(ctx context.Context, ch chan<- identity.Instance, cfg *conf.Config) {
+	log, ok := ctx.Value(model.LOGGER).(*zap.Logger)
+	if !ok {
+		log = zap.L()
+	}
+	log = log.With(zap.String("action", "service_diesocvery"))
+
+	client, err := consul.NewClient(consul.DefaultConfig())
+	if err != nil {
+		log.Error(err.Error(), zap.String("phase", "create_client"))
+		return
+	}
+
+	session, _, err := client.Session().Create(&consul.SessionEntry{
+		TTL: "60s",
+	}, nil)
+	if err != nil {
+		log.Error(err.Error(), zap.String("phase", "create_session"))
+		return
+	}
+
+	query, _, err := client.PreparedQuery().Create(&consul.PreparedQueryDefinition{
+		Session: session,
+		Service: consul.ServiceQuery{
+			Service: "identity",
+		},
+	}, nil)
+	if err != nil {
+		log.Error(err.Error(), zap.String("phase", "create_query"))
+		return
+	}
+
+	instances := make(map[string]identity.Instance) // map[instanceID:tag]identity.Instance
+	ticker := time.NewTicker(30 * time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info("done")
+			return
+
+		case <-ticker.C:
+			resp, _, err := client.PreparedQuery().Execute(query, nil)
+			if err != nil {
+				log.Error(err.Error(), zap.String("phase", "execute_query"))
+				continue
+			}
+
+			alivedInstances := make(map[string]struct{})
+			for _, node := range resp.Nodes {
+				for _, tag := range node.Service.Tags {
+
+					modified := false
+
+					id := node.Service.ID + ":" + tag
+					instance, ok := instances[id]
+					if !ok {
+						modified = true
+						instance = identity.Instance{
+							ID:       node.Service.ID,
+							Protocol: tag,
+							IsAlive:  true,
+						}
+					}
+
+					switch tag {
+					case "http", "https":
+						// TODO
+
+					case "nats":
+						if address, ok := node.Service.TaggedAddresses["nats"]; !ok {
+							log.Error("address not found")
+							continue
+						} else {
+							if instance.Address != address.Address {
+								instance.Address = address.Address
+								modified = true
+							}
+
+							if instance.Port != address.Port {
+								instance.Port = address.Port
+								modified = true
+							}
+						}
+
+						if reqPrefix, ok := node.Service.Meta["nats_request_prefix"]; !ok {
+							log.Error("prefix not found")
+							continue
+						} else {
+							if instance.RequestPrefix != reqPrefix {
+								instance.RequestPrefix = reqPrefix
+								modified = true
+							}
+						}
+					}
+
+					if modified {
+						endpoints, err := transport.MakeEndpoints(instance)
+						if err != nil {
+							log.Error(err.Error())
+							continue
+						}
+
+						instance.ModifiedTime = time.Now()
+						instance.Endpoints = endpoints
+						instances[id] = instance
+
+						// update identity.ProxyingMiddleware.instances
+						ch <- instance
+					}
+
+					alivedInstances[id] = struct{}{}
+				}
+			}
+
+			for id, instance := range instances {
+				if _, ok := alivedInstances[id]; ok {
+					continue
+				}
+
+				instance.IsAlive = false
+				ch <- instance
+
+				delete(instances, id)
+			}
+
+			client.Session().Renew(session, nil)
 		}
 	}
 }

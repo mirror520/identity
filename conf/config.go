@@ -27,8 +27,8 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	// TODO
-	if cfg.Persistent.Host == "" {
-		cfg.Persistent.Host = path
+	if cfg.Persistence.Host == "" {
+		cfg.Persistence.Host = path
 	}
 
 	return cfg, nil
@@ -42,7 +42,7 @@ type Config struct {
 	BaseURL       string         `yaml:"baseUrl"`
 	JWT           JWT            `yaml:"jwt"`
 	Transport     Transport      `yaml:"transport"`
-	Persistent    Persistent     `yaml:"persistent"`
+	Persistence   Persistence    `yaml:"persistence"`
 	EventBus      EventBus       `yaml:"eventBus"`
 	Providers     Providers      `yaml:"providers"`
 	Test          Test           `yaml:"test"`
@@ -120,15 +120,15 @@ type Transport struct {
 	} `yaml:"loadBalancing"`
 }
 
-type PersistentDriver int
+type PersistenceDriver int
 
 const (
-	SQLite PersistentDriver = iota
+	SQLite PersistenceDriver = iota
 	BadgerDB
 	InMem
 )
 
-func ParsePersistentDriver(driver string) (PersistentDriver, error) {
+func ParsePersistenceDriver(driver string) (PersistenceDriver, error) {
 	switch driver {
 	case "sqlite":
 		return SQLite, nil
@@ -141,7 +141,7 @@ func ParsePersistentDriver(driver string) (PersistentDriver, error) {
 	}
 }
 
-func (driver PersistentDriver) String() string {
+func (driver PersistenceDriver) String() string {
 	switch driver {
 	case SQLite:
 		return "sqlite"
@@ -154,8 +154,8 @@ func (driver PersistentDriver) String() string {
 	}
 }
 
-type Persistent struct {
-	Driver   PersistentDriver
+type Persistence struct {
+	Driver   PersistenceDriver
 	Name     string
 	Host     string
 	Port     int
@@ -164,7 +164,7 @@ type Persistent struct {
 	InMem    bool
 }
 
-func (p *Persistent) UnmarshalYAML(value *yaml.Node) error {
+func (p *Persistence) UnmarshalYAML(value *yaml.Node) error {
 	var raw struct {
 		Driver   string `yaml:"driver"`
 		Name     string `yaml:"name"`
@@ -179,7 +179,7 @@ func (p *Persistent) UnmarshalYAML(value *yaml.Node) error {
 		return err
 	}
 
-	driver, err := ParsePersistentDriver(raw.Driver)
+	driver, err := ParsePersistenceDriver(raw.Driver)
 	if err != nil {
 		return err
 	}
@@ -205,6 +205,15 @@ func ParseTransportProvider(provider string) (TransportProvider, error) {
 		return NATS, nil
 	default:
 		return -1, errors.New("provider not supported")
+	}
+}
+
+func (p TransportProvider) String() string {
+	switch p {
+	case NATS:
+		return "nats"
+	default:
+		return ""
 	}
 }
 

@@ -97,13 +97,18 @@ func AddSocialAccountEndpoint(svc Service) endpoint.Endpoint {
 
 func EventEndpoint(svc Service) endpoint.Endpoint {
 	return func(ctx context.Context, request any) (response any, err error) {
+		handler, err := svc.Handler()
+		if err != nil {
+			return nil, err
+		}
+
 		switch e := request.(type) {
 		case *user.UserRegisteredEvent:
-			err = svc.UserRegisteredHandler(e)
+			err = handler.UserRegisteredHandler(e)
 		case *user.UserActivatedEvent:
-			err = svc.UserActivatedHandler(e)
+			err = handler.UserActivatedHandler(e)
 		case *user.UserSocialAccountAddedEvent:
-			err = svc.UserSocialAccountAddedHandler(e)
+			err = handler.UserSocialAccountAddedHandler(e)
 		default:
 			err = errors.New("invalid request")
 		}

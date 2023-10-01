@@ -21,7 +21,7 @@ transport:
   loadBalancing:
     enabled: false
 
-persistent:
+persistence:
   driver: badger
   name: users
 

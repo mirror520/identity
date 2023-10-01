@@ -7,7 +7,7 @@ import (
 
 	"github.com/mirror520/identity"
 	"github.com/mirror520/identity/conf"
-	"github.com/mirror520/identity/persistent/db"
+	"github.com/mirror520/identity/persistence/db"
 	"github.com/mirror520/identity/user"
 )
 
@@ -30,7 +30,7 @@ func (suite *identityTestSuite) SetupSuite() {
 		suite.token = cfg.Test.Token
 	}
 
-	users, err := db.NewUserRepository(cfg.Persistent)
+	users, err := db.NewUserRepository(cfg.Persistence)
 	if err != nil {
 		suite.Fail(err.Error())
 		return

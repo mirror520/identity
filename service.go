@@ -25,6 +25,10 @@ type Service interface {
 	SignIn(credential string, provider user.SocialProvider) (*user.User, error)
 	AddSocialAccount(credential string, provider user.SocialProvider, id user.UserID) (*user.User, error)
 
+	Handler() (EventHandler, error)
+}
+
+type EventHandler interface {
 	UserRegisteredHandler(e *user.UserRegisteredEvent) error
 	UserActivatedHandler(e *user.UserActivatedEvent) error
 	UserSocialAccountAddedHandler(e *user.UserSocialAccountAddedEvent) error
@@ -44,6 +48,10 @@ func NewService(users user.Repository, cfg conf.Providers) Service {
 		user.GOOGLE: cfg.Google.Client.ID,
 	}
 	return svc
+}
+
+func (svc *service) Handler() (EventHandler, error) {
+	return svc, nil
 }
 
 func (svc *service) Register(username string, name string, email string) (*user.User, error) {

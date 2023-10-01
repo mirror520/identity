@@ -26,6 +26,6 @@ func TestLoadConfig(t *testing.T) {
 	assert.True(cfg.JWT.Refresh.Enabled)
 	assert.Equal(1*time.Hour+30*time.Minute, cfg.JWT.Refresh.Maximum)
 
-	assert.Equal(BadgerDB, cfg.Persistent.Driver)
-	assert.Equal("users", cfg.Persistent.Name)
+	assert.Equal(BadgerDB, cfg.Persistence.Driver)
+	assert.Equal("users", cfg.Persistence.Name)
 }

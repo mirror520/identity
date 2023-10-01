@@ -23,11 +23,6 @@ type ConsumerStream struct {
 func NewPubSub(cfg conf.EventBus) (pubsub.PubSub, error) {
 	url := "nats://" + cfg.Host + ":" + strconv.Itoa(cfg.Port)
 
-	log := zap.L().With(
-		zap.String("pubsub", "nats"),
-		zap.String("url", url),
-	)
-
 	nc, err := nats.Connect(url)
 	if err != nil {
 		return nil, err
@@ -41,7 +36,10 @@ func NewPubSub(cfg conf.EventBus) (pubsub.PubSub, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &pubSub{
-		log:           log,
+		log: zap.L().With(
+			zap.String("pubsub", "nats"),
+			zap.String("url", url),
+		),
 		nc:            nc,
 		js:            js,
 		subscriptions: make(map[string]*nats.Subscription),
@@ -140,11 +138,16 @@ func (ps *pubSub) PullSubscribe(consumer string, stream string, callback pubsub.
 
 	ctx := context.WithValue(ps.rootCtx, model.LOGGER, log)
 	ctx, cancel := context.WithCancel(ctx)
+
 	ps.Lock()
+
+	ps.subscriptions[consumer+"_"+stream] = sub
+
 	if cancel, ok := ps.cancels[cs]; ok {
 		cancel()
 	}
 	ps.cancels[cs] = cancel
+
 	ps.Unlock()
 
 	go ps.pull(ctx, sub, callback)

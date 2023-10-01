@@ -42,6 +42,11 @@ func (name EventName) String() string {
 	}
 }
 
+func (name *EventName) MarshalJSON() ([]byte, error) {
+	jsonStr := `"` + name.String() + `"`
+	return []byte(jsonStr), nil
+}
+
 type Event struct {
 	Domain    string    `json:"domain"`
 	Name      EventName `json:"name"`

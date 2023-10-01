@@ -16,7 +16,7 @@ type userRepositoryTestSuite struct {
 }
 
 func (suite *userRepositoryTestSuite) SetupSuite() {
-	cfg := conf.Persistent{
+	cfg := conf.Persistence{
 		Driver: conf.SQLite,
 		Name:   "identity",
 		InMem:  true,
