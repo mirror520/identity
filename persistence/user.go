@@ -1,16 +1,16 @@
-package persistent
+package persistence
 
 import (
 	"errors"
 
 	"github.com/mirror520/identity/conf"
-	"github.com/mirror520/identity/persistent/db"
-	"github.com/mirror520/identity/persistent/inmem"
-	"github.com/mirror520/identity/persistent/kv"
+	"github.com/mirror520/identity/persistence/db"
+	"github.com/mirror520/identity/persistence/inmem"
+	"github.com/mirror520/identity/persistence/kv"
 	"github.com/mirror520/identity/user"
 )
 
-func NewUserRepository(cfg conf.Persistent) (user.Repository, error) {
+func NewUserRepository(cfg conf.Persistence) (user.Repository, error) {
 	switch cfg.Driver {
 	case conf.SQLite:
 		return db.NewUserRepository(cfg)

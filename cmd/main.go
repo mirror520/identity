@@ -20,7 +20,8 @@ import (
 	"github.com/mirror520/identity"
 	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/events"
-	"github.com/mirror520/identity/persistent"
+	"github.com/mirror520/identity/model"
+	"github.com/mirror520/identity/persistence"
 	"github.com/mirror520/identity/pubsub/nats"
 	"github.com/mirror520/identity/transport"
 	"github.com/mirror520/identity/transport/http"
@@ -47,12 +48,12 @@ func main() {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "path",
-				Usage:   "Specifies the working directory for the identity microservice.",
+				Usage:   "Specifies the working directory",
 				EnvVars: []string{"IDENTITY_PATH"},
 			},
 			&cli.IntFlag{
 				Name:    "port",
-				Usage:   "Specifies the HTTP service port for the identity microservice.",
+				Usage:   "Specifies the HTTP service port",
 				Value:   8080,
 				EnvVars: []string{"IDENTITY_HTTP_PORT"},
 			},
@@ -92,11 +93,13 @@ func run(cli *cli.Context) error {
 
 	zap.ReplaceGlobals(log)
 
-	log = log.With(zap.String("action", "main"))
-
+	// Add PubSub
 	pubSub, err := nats.NewPullBasedPubSub(cfg.EventBus)
 	if err != nil {
-		log.Error(err.Error(), zap.String("infra", "nats"))
+		log.Error(err.Error(),
+			zap.String("infra", "pubsub"),
+			zap.String("provider", cfg.EventBus.Provider.String()),
+		)
 		return err
 	}
 	defer pubSub.Close()
@@ -106,7 +109,8 @@ func run(cli *cli.Context) error {
 	stream := cfg.EventBus.Users.Stream
 	if err := pubSub.AddStream(stream.Name, stream.Config); err != nil {
 		log.Error(err.Error(),
-			zap.String("infra", "nats"),
+			zap.String("infra", "pubsub"),
+			zap.String("provider", cfg.EventBus.Provider.String()),
 			zap.String("phase", "add_stream"),
 			zap.String("stream", stream.Name),
 		)
@@ -116,7 +120,8 @@ func run(cli *cli.Context) error {
 	consumer := cfg.EventBus.Users.Consumer
 	if err := pubSub.AddConsumer(consumer.Name, stream.Name, consumer.Config); err != nil {
 		log.Error(err.Error(),
-			zap.String("infra", "nats"),
+			zap.String("infra", "pubsub"),
+			zap.String("provider", cfg.EventBus.Provider.String()),
 			zap.String("phase", "add_consumer"),
 			zap.String("stream", stream.Name),
 			zap.String("consumer", consumer.Name),
@@ -124,19 +129,22 @@ func run(cli *cli.Context) error {
 		return err
 	}
 
-	repo, err := persistent.NewUserRepository(cfg.Persistent)
+	// Add Persistence
+	repo, err := persistence.NewUserRepository(cfg.Persistence)
 	if err != nil {
 		log.Error(err.Error(),
-			zap.String("infra", "persistent"),
-			zap.String("driver", cfg.Persistent.Driver.String()),
+			zap.String("infra", "persistence"),
+			zap.String("driver", cfg.Persistence.Driver.String()),
 		)
 		return err
 	}
 	defer repo.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx := context.WithValue(context.Background(), model.LOGGER, log)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// Add Service and Middlewares
 	svc := identity.NewService(repo, cfg.Providers)
 
 	if cfg.Transport.LoadBalancing.Enabled {
@@ -146,7 +154,7 @@ func run(cli *cli.Context) error {
 		go Discovery(ctx, ch, cfg)
 	}
 
-	svc = identity.LoggingMiddleware(zap.L())(svc)
+	svc = identity.LoggingMiddleware(log)(svc)
 
 	r := gin.Default()
 	r.Use(cors.Default())
@@ -215,9 +223,11 @@ func run(cli *cli.Context) error {
 }
 
 func Registry(ctx context.Context, cfg *conf.Config) {
-	log := zap.L().With(
-		zap.String("action", "service_registry"),
-	)
+	log, ok := ctx.Value(model.LOGGER).(*zap.Logger)
+	if !ok {
+		log = zap.L()
+	}
+	log = log.With(zap.String("action", "service_registry"))
 
 	client, err := consul.NewClient(consul.DefaultConfig())
 	if err != nil {
@@ -299,13 +309,15 @@ func Registry(ctx context.Context, cfg *conf.Config) {
 }
 
 func Discovery(ctx context.Context, ch chan<- identity.Instance, cfg *conf.Config) {
-	log := zap.L().With(
-		zap.String("action", "service_diesocvery"),
-	)
+	log, ok := ctx.Value(model.LOGGER).(*zap.Logger)
+	if !ok {
+		log = zap.L()
+	}
+	log = log.With(zap.String("action", "service_diesocvery"))
 
 	client, err := consul.NewClient(consul.DefaultConfig())
 	if err != nil {
-		log.Error(err.Error())
+		log.Error(err.Error(), zap.String("phase", "create_client"))
 		return
 	}
 
@@ -313,7 +325,7 @@ func Discovery(ctx context.Context, ch chan<- identity.Instance, cfg *conf.Confi
 		TTL: "60s",
 	}, nil)
 	if err != nil {
-		log.Error(err.Error())
+		log.Error(err.Error(), zap.String("phase", "create_session"))
 		return
 	}
 
@@ -324,7 +336,7 @@ func Discovery(ctx context.Context, ch chan<- identity.Instance, cfg *conf.Confi
 		},
 	}, nil)
 	if err != nil {
-		log.Error(err.Error())
+		log.Error(err.Error(), zap.String("phase", "create_query"))
 		return
 	}
 
@@ -339,7 +351,7 @@ func Discovery(ctx context.Context, ch chan<- identity.Instance, cfg *conf.Confi
 		case <-ticker.C:
 			resp, _, err := client.PreparedQuery().Execute(query, nil)
 			if err != nil {
-				log.Error(err.Error())
+				log.Error(err.Error(), zap.String("phase", "execute_query"))
 				continue
 			}
 

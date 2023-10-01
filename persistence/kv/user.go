@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/dgraph-io/badger/v3"
+	"github.com/dgraph-io/badger/v4"
 
 	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/events"
@@ -15,7 +15,7 @@ type userRepository struct {
 	db *badger.DB
 }
 
-func NewUserRepository(cfg conf.Persistent) (user.Repository, error) {
+func NewUserRepository(cfg conf.Persistence) (user.Repository, error) {
 	opts := badger.DefaultOptions(cfg.Host + "/" + cfg.Name)
 	if cfg.InMem {
 		opts = badger.DefaultOptions("").WithInMemory(true)

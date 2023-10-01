@@ -1,5 +1,5 @@
 /.vscode/
-/persistent/kv/identity/
+/persistence/kv/identity/
 /release/
 config.yaml
 *.db
