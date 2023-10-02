@@ -11,8 +11,10 @@ import (
 )
 
 var (
-	signInFactories = make(map[string]sd.Factory)
+	ErrEndpointEmpty = errors.New("endpoint empty")
 )
+
+var signInFactories = make(map[string]sd.Factory)
 
 func MakeEndpoints(instance identity.Instance) (*identity.EndpointSet, error) {
 	endpoints := new(identity.EndpointSet)
@@ -42,7 +44,7 @@ func MakeEndpoints(instance identity.Instance) (*identity.EndpointSet, error) {
 	}
 
 	if empty {
-		return nil, errors.New("endpoint empty")
+		return nil, ErrEndpointEmpty
 	}
 
 	return endpoints, nil

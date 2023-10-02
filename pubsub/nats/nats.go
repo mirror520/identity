@@ -9,6 +9,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/model"
@@ -171,7 +172,9 @@ func (ps *pubSub) pull(ctx context.Context, sub *nats.Subscription, callback pub
 		default:
 			msgs, err := sub.Fetch(100)
 			if err != nil && !errors.Is(err, nats.ErrTimeout) {
-				log.Error(err.Error())
+				log.WithOptions(
+					nop(err, nats.ErrTimeout, nats.ErrBadSubscription),
+				).Error(err.Error())
 				continue
 			}
 
@@ -215,4 +218,16 @@ func (ps *pubSub) Close() error {
 	}
 
 	return ps.nc.Drain()
+}
+
+func nop(target error, errs ...error) zap.Option {
+	return zap.WrapCore(func(core zapcore.Core) zapcore.Core {
+		for _, err := range errs {
+			if errors.Is(err, target) {
+				return zapcore.NewNopCore()
+			}
+		}
+
+		return core
+	})
 }

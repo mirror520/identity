@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	consul "github.com/hashicorp/consul/api"
 
@@ -34,6 +36,28 @@ var (
 	GitCommit string
 )
 
+var versionCmd = &cli.Command{
+	Name:    "version",
+	Aliases: []string{"ver", "v"},
+	Usage:   "Show version",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "all",
+			Aliases: []string{"a"},
+			Usage:   "Show all infomation (include: Version, BuildTime, GitCommit)",
+			Value:   false,
+		},
+	},
+	Action: func(ctx *cli.Context) error {
+		if !ctx.Bool("all") {
+			fmt.Println(ctx.App.Version)
+		} else {
+			cli.ShowVersion(ctx)
+		}
+		return nil
+	},
+}
+
 func main() {
 	cli.VersionPrinter = func(cli *cli.Context) {
 		fmt.Println("Version: " + cli.App.Version)
@@ -42,9 +66,10 @@ func main() {
 	}
 
 	app := &cli.App{
-		Name:    "identity",
-		Usage:   "Scalable and decentralized user identity management",
-		Version: Version,
+		Name:     "identity",
+		Usage:    "Scalable and decentralized user identity management",
+		Version:  Version,
+		Commands: []*cli.Command{versionCmd},
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "path",
@@ -93,7 +118,37 @@ func run(cli *cli.Context) error {
 
 	zap.ReplaceGlobals(log)
 
-	// Add PubSub
+	ctx := context.WithValue(context.Background(), model.LOGGER, log)
+
+	// Add Persistence
+	repo, err := persistence.NewUserRepository(cfg.Persistence)
+	if err != nil {
+		log.Error(err.Error(),
+			zap.String("infra", "persistence"),
+			zap.String("driver", cfg.Persistence.Driver.String()),
+		)
+		return err
+	}
+	defer repo.Close()
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Add Service and Middlewares
+	svc := identity.NewService(repo, cfg.Providers)
+
+	if cfg.Transport.LoadBalancing.Enabled {
+		ch := make(chan identity.Instance, 1)
+		svc = identity.ProxyingMiddleware(ctx, ch)(svc)
+
+		go Discovery(ctx, ch, cfg)
+	}
+
+	svc = identity.LoggingMiddleware(log)(svc)
+
+	// Add Transports
+
+	// Add PubSub Transport
 	pubSub, err := nats.NewPullBasedPubSub(cfg.EventBus)
 	if err != nil {
 		log.Error(err.Error(),
@@ -106,6 +161,7 @@ func run(cli *cli.Context) error {
 
 	events.ReplaceGlobals(pubSub)
 
+	// Add Productors and Consumers for Users
 	stream := cfg.EventBus.Users.Stream
 	if err := pubSub.AddStream(stream.Name, stream.Config); err != nil {
 		log.Error(err.Error(),
@@ -129,33 +185,7 @@ func run(cli *cli.Context) error {
 		return err
 	}
 
-	// Add Persistence
-	repo, err := persistence.NewUserRepository(cfg.Persistence)
-	if err != nil {
-		log.Error(err.Error(),
-			zap.String("infra", "persistence"),
-			zap.String("driver", cfg.Persistence.Driver.String()),
-		)
-		return err
-	}
-	defer repo.Close()
-
-	ctx := context.WithValue(context.Background(), model.LOGGER, log)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	// Add Service and Middlewares
-	svc := identity.NewService(repo, cfg.Providers)
-
-	if cfg.Transport.LoadBalancing.Enabled {
-		ch := make(chan identity.Instance, 1)
-		svc = identity.ProxyingMiddleware(ctx, ch)(svc)
-
-		go Discovery(ctx, ch, cfg)
-	}
-
-	svc = identity.LoggingMiddleware(log)(svc)
-
+	// Add HTTP Transport
 	r := gin.Default()
 	r.Use(cors.Default())
 
@@ -217,8 +247,8 @@ func run(cli *cli.Context) error {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	sign := <-quit
-	log.Info(sign.String())
 
+	log.Info("shutdown", zap.String("singal", sign.String()))
 	return nil
 }
 
@@ -406,7 +436,9 @@ func Discovery(ctx context.Context, ch chan<- identity.Instance, cfg *conf.Confi
 					if modified {
 						endpoints, err := transport.MakeEndpoints(instance)
 						if err != nil {
-							log.Error(err.Error())
+							log.WithOptions(
+								nop(err, transport.ErrEndpointEmpty),
+							).Error(err.Error())
 							continue
 						}
 
@@ -436,4 +468,16 @@ func Discovery(ctx context.Context, ch chan<- identity.Instance, cfg *conf.Confi
 			client.Session().Renew(session, nil)
 		}
 	}
+}
+
+func nop(target error, errs ...error) zap.Option {
+	return zap.WrapCore(func(core zapcore.Core) zapcore.Core {
+		for _, err := range errs {
+			if errors.Is(err, target) {
+				return zapcore.NewNopCore()
+			}
+		}
+
+		return core
+	})
 }
