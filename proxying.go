@@ -23,13 +23,6 @@ type Instance struct {
 	Endpoints *EndpointSet
 }
 
-type EndpointSet struct {
-	Register         endpoint.Endpoint
-	SignIn           endpoint.Endpoint
-	OTPVerify        endpoint.Endpoint
-	AddSocialAccount endpoint.Endpoint
-}
-
 func ProxyingMiddleware(ctx context.Context, ch <-chan Instance) ServiceMiddleware {
 	return func(next Service) Service {
 		mw := &proxyingMiddleware{
@@ -144,6 +137,10 @@ func (mw *proxyingMiddleware) SignIn(credential string, provider user.SocialProv
 
 func (mw *proxyingMiddleware) AddSocialAccount(credential string, provider user.SocialProvider, id user.UserID) (*user.User, error) {
 	return mw.next.AddSocialAccount(credential, provider, id)
+}
+
+func (mw *proxyingMiddleware) CheckHealth(ctx context.Context) error {
+	return mw.next.CheckHealth(ctx)
 }
 
 func (mw *proxyingMiddleware) Handler() (EventHandler, error) {

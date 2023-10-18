@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	ginzap "github.com/gin-contrib/zap"
 	consul "github.com/hashicorp/consul/api"
 
 	"github.com/mirror520/identity"
@@ -24,10 +25,12 @@ import (
 	"github.com/mirror520/identity/events"
 	"github.com/mirror520/identity/model"
 	"github.com/mirror520/identity/persistence"
+	"github.com/mirror520/identity/pubsub"
 	"github.com/mirror520/identity/pubsub/nats"
 	"github.com/mirror520/identity/transport"
-	"github.com/mirror520/identity/transport/http"
-	"github.com/mirror520/identity/transport/pubsub"
+
+	transHTTP "github.com/mirror520/identity/transport/http"
+	transPubSub "github.com/mirror520/identity/transport/pubsub"
 )
 
 var (
@@ -94,21 +97,15 @@ func main() {
 }
 
 func run(cli *cli.Context) error {
-	path := cli.String("path")
-	if path == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-
-		path = homeDir + "/.identity"
-	}
-
-	cfg, err := conf.LoadConfig(path)
+	err := conf.LoadEnv(cli)
 	if err != nil {
 		return err
 	}
-	cfg.Port = cli.Int("port")
+
+	cfg, err := conf.LoadConfig()
+	if err != nil {
+		return err
+	}
 
 	log, err := zap.NewDevelopment()
 	if err != nil {
@@ -137,7 +134,7 @@ func run(cli *cli.Context) error {
 	// Add Service and Middlewares
 	svc := identity.NewService(repo, cfg.Providers)
 
-	if cfg.Transport.LoadBalancing.Enabled {
+	if cfg.Transports.LoadBalancing.Enabled {
 		ch := make(chan identity.Instance, 1)
 		svc = identity.ProxyingMiddleware(ctx, ch)(svc)
 
@@ -146,100 +143,104 @@ func run(cli *cli.Context) error {
 
 	svc = identity.LoggingMiddleware(log)(svc)
 
+	// Add Endpoints
+	endpoints := identity.EndpointSet{
+		Register:         identity.RegisterEndpoint(svc),
+		SignIn:           identity.SignInEndpoint(svc),
+		OTPVerify:        identity.OTPVerifyEndpoint(svc),
+		AddSocialAccount: identity.AddSocialAccountEndpoint(svc),
+		CheckHealth:      identity.CheckHealth(svc),
+	}
+
 	// Add Transports
 
 	// Add PubSub Transport
-	pubSub, err := nats.NewPullBasedPubSub(cfg.EventBus)
-	if err != nil {
-		log.Error(err.Error(),
+	var pubSub pubsub.PubSub
+	{
+		log := log.With(
 			zap.String("infra", "pubsub"),
 			zap.String("provider", cfg.EventBus.Provider.String()),
 		)
-		return err
+
+		ps, err := nats.NewNATSPubSub(cfg.Transports.NATS.Internal)
+		if err != nil {
+			log.Error(err.Error())
+			return err
+		}
+		defer ps.Close()
+
+		stream := cfg.EventBus.Users.Stream
+		if err := ps.AddStream(stream.Name, stream.Config); err != nil {
+			log.Error(err.Error(),
+				zap.String("phase", "add_stream"),
+				zap.String("stream", stream.Name),
+			)
+			return err
+		}
+
+		consumer := cfg.EventBus.Users.Consumer
+		if err := ps.AddConsumer(consumer.Name, consumer.Stream, consumer.Config); err != nil {
+			log.Error(err.Error(),
+				zap.String("phase", "add_consumer"),
+				zap.String("consumer", consumer.Name),
+			)
+			return err
+		}
+
+		// SUB users.>
+		endpoint := identity.EventEndpoint(svc)
+		ps.PullSubscribe(
+			consumer.Name,
+			stream.Name,
+			transPubSub.EventHandler(endpoint),
+		)
+
+		pubSub = ps
 	}
-	defer pubSub.Close()
 
 	events.ReplaceGlobals(pubSub)
 
-	// Add Productors and Consumers for Users
-	stream := cfg.EventBus.Users.Stream
-	if err := pubSub.AddStream(stream.Name, stream.Config); err != nil {
-		log.Error(err.Error(),
-			zap.String("infra", "pubsub"),
-			zap.String("provider", cfg.EventBus.Provider.String()),
-			zap.String("phase", "add_stream"),
-			zap.String("stream", stream.Name),
-		)
-		return err
-	}
+	if nats := cfg.Transports.NATS; nats.Enabled {
+		// SUB identity.signin and identity.$INSTANCE.signin
+		signInHandler := transPubSub.SignInHandler(endpoints.SignIn)
+		pubSub.Subscribe("identity.signin", signInHandler)        // NATS LB
+		pubSub.Subscribe(nats.ReqPrefix+".signin", signInHandler) // NATS Direct
 
-	consumer := cfg.EventBus.Users.Consumer
-	if err := pubSub.AddConsumer(consumer.Name, stream.Name, consumer.Config); err != nil {
-		log.Error(err.Error(),
-			zap.String("infra", "pubsub"),
-			zap.String("provider", cfg.EventBus.Provider.String()),
-			zap.String("phase", "add_consumer"),
-			zap.String("stream", stream.Name),
-			zap.String("consumer", consumer.Name),
-		)
-		return err
+		// SUB identity.$INSTANCE.health
+		checkHealthHandler := transPubSub.CheckHealthHandler(endpoints.CheckHealth)
+		pubSub.Subscribe(nats.ReqPrefix+".health", checkHealthHandler)
 	}
 
 	// Add HTTP Transport
-	r := gin.Default()
+	r := gin.New()
+	r.Use(ginzap.Ginzap(log, time.RFC3339, true))
+	r.Use(gin.Recovery())
 	r.Use(cors.Default())
 
-	r.GET("/health", func(ctx *gin.Context) {
-		ctx.JSON(200, "ok")
-	})
+	r.GET("/health", transHTTP.CheckHealthHandler(endpoints.CheckHealth))
 
 	apiV1 := r.Group("/identity/v1")
 	{
-		// PATCH /signin
-		{
-			endpoint := identity.SignInEndpoint(svc)
-
-			authenticator := http.SignInAuthenticator(endpoint)
-			authMiddleware, err := http.AuthMiddlware(authenticator, *cfg)
-			if err != nil {
-				return err
-			}
-
-			// TODO: change GinJWTMiddleware to Endpoint
-			apiV1.PATCH("/signin", authMiddleware.LoginHandler)
-
-			if cfg.Transport.NATS.Enabled {
-				pubSub.Subscribe("identity.signin", pubsub.SignInHandler(endpoint))                      // NATS LB
-				pubSub.Subscribe(cfg.Transport.NATS.ReqPrefix+".signin", pubsub.SignInHandler(endpoint)) // NATS Direct
-			}
+		authenticator := transHTTP.SignInAuthenticator(endpoints.SignIn)
+		authMiddleware, err := transHTTP.AuthMiddlware(authenticator, *cfg)
+		if err != nil {
+			return err
 		}
+
+		// PATCH /signin
+		apiV1.PATCH("/signin", authMiddleware.LoginHandler)
 
 		// POST /users
-		{
-			endpoint := identity.RegisterEndpoint(svc)
-			apiV1.POST("/users", http.RegisterHandler(endpoint))
-		}
+		apiV1.POST("/users", transHTTP.RegisterHandler(endpoints.Register))
 
 		// PATCH /users/:id/verify
-		{
-			endpoint := identity.OTPVerifyEndpoint(svc)
-			apiV1.POST("/users/:id/verify", http.OTPVerifyHandler(endpoint))
-		}
+		apiV1.POST("/users/:id/verify", transHTTP.OTPVerifyHandler(endpoints.OTPVerify))
 
 		// PUT /users/id/socials
-		{
-			endpoint := identity.AddSocialAccountEndpoint(svc)
-			apiV1.POST("/users/:id/socials", http.AddSocialAccountHandler(endpoint))
-		}
+		apiV1.POST("/users/:id/socials", transHTTP.AddSocialAccountHandler(endpoints.AddSocialAccount))
 	}
 
-	// SUB users.>
-	{
-		endpoint := identity.EventEndpoint(svc)
-		pubSub.PullSubscribe(consumer.Name, stream.Name, pubsub.EventHandler(endpoint))
-	}
-
-	go r.Run(":" + strconv.Itoa(cfg.Port))
+	go r.Run(":" + strconv.Itoa(conf.Port))
 
 	go Registry(ctx, cfg)
 
@@ -259,55 +260,122 @@ func Registry(ctx context.Context, cfg *conf.Config) {
 	}
 	log = log.With(zap.String("action", "service_registry"))
 
+	if !cfg.Transports.HTTP.Enabled && !cfg.Transports.NATS.Enabled {
+		log.Warn("service registeration ignored")
+		return
+	}
+
 	client, err := consul.NewClient(consul.DefaultConfig())
 	if err != nil {
 		log.Error(err.Error())
 		return
 	}
 
-	http := "http"
-	address := "localhost"
-	port := cfg.Port
+	tags := make([]string, 0)
 
-	if cfg.ExternalProxy != nil {
-		http = cfg.ExternalProxy.Scheme
-		address = cfg.ExternalProxy.Address
-		port = cfg.ExternalProxy.Port
+	if Version != "" {
+		tags = append(tags, Version)
 	}
 
 	service := &consul.AgentServiceRegistration{
-		ID:      cfg.Name,
-		Name:    "identity",
-		Tags:    []string{http},
-		Port:    port,
-		Address: address,
-		TaggedAddresses: map[string]consul.ServiceAddress{
-			http: {Address: address, Port: port},
-		},
-		Meta: make(map[string]string),
-		Check: &consul.AgentServiceCheck{
-			Interval:                       "10s",
-			Timeout:                        "1s",
-			HTTP:                           http + "://" + address + ":" + strconv.Itoa(port) + "/health",
-			DeregisterCriticalServiceAfter: "60s",
-		},
+		ID:              cfg.Name,
+		Name:            "identity",
+		Port:            conf.Port,
+		Address:         "localhost",
+		Tags:            tags,
+		TaggedAddresses: make(map[string]consul.ServiceAddress),
+		Meta:            make(map[string]string),
+		Checks:          make(consul.AgentServiceChecks, 0),
 	}
 
-	if cfg.Transport.NATS.Enabled {
-		service.Tags = append(service.Tags, "nats")
-		service.TaggedAddresses["nats"] = consul.ServiceAddress{
-			Address: cfg.EventBus.Host,
-			Port:    cfg.EventBus.Port,
+	if cfg.Transports.HTTP.Enabled {
+		http := cfg.Transports.HTTP.Internal
+		service.Port = http.Port
+		service.Address = http.Host
+		service.Tags = append(service.Tags, http.Scheme)
+		service.TaggedAddresses[http.Scheme] = consul.ServiceAddress{
+			Address: http.Host,
+			Port:    http.Port,
 		}
-		service.Meta["nats_request_prefix"] = cfg.Transport.NATS.ReqPrefix
+
+		if http.Health.Enabled {
+			check := &consul.AgentServiceCheck{
+				Interval:                       "10s",
+				Timeout:                        "1s",
+				HTTP:                           http.URL() + http.Health.Path,
+				DeregisterCriticalServiceAfter: "60s",
+			}
+			service.Checks = append(service.Checks, check)
+		}
+
+		if http := cfg.Transports.HTTP.External; http != nil {
+			service.Tags = append(service.Tags, http.Scheme)
+			service.TaggedAddresses[http.Scheme] = consul.ServiceAddress{
+				Address: http.Host,
+				Port:    http.Port,
+			}
+
+			if http.Health.Enabled {
+				check := &consul.AgentServiceCheck{
+					Interval:                       "10s",
+					Timeout:                        "1s",
+					HTTP:                           http.URL() + http.Health.Path,
+					DeregisterCriticalServiceAfter: "60s",
+				}
+
+				service.Checks = append(service.Checks, check)
+			}
+		}
 	}
 
-	if cfg.Transport.LoadBalancing.Enabled {
+	if cfg.Transports.NATS.Enabled {
+		nats := cfg.Transports.NATS.Internal
+		service.Tags = append(service.Tags, nats.Scheme)
+		service.TaggedAddresses[nats.Scheme] = consul.ServiceAddress{
+			Address: nats.Host,
+			Port:    nats.Port,
+		}
+		service.Meta["nats_request_prefix"] = cfg.Transports.NATS.ReqPrefix
+
+		if nats.Health.Enabled {
+			check := &consul.AgentServiceCheck{
+				Interval: "10s",
+				Timeout:  "1s",
+				Args: []string{
+					"/consul/script/nats-health-check",
+					"--host", nats.Host,
+					"--subject", nats.Health.Path,
+				},
+				DeregisterCriticalServiceAfter: "60s",
+			}
+			service.Checks = append(service.Checks, check)
+		}
+
+		if nats := cfg.Transports.NATS.External; nats != nil {
+			// override
+			service.TaggedAddresses[nats.Scheme] = consul.ServiceAddress{
+				Address: nats.Host,
+				Port:    nats.Port,
+			}
+
+			if nats.Health.Enabled {
+				check := &consul.AgentServiceCheck{
+					Interval: "10s",
+					Timeout:  "1s",
+					Args: []string{
+						"/consul/script/nats-health-check",
+						"--host", nats.Host,
+						"--subject", nats.Health.Path,
+					},
+					DeregisterCriticalServiceAfter: "60s",
+				}
+				service.Checks = append(service.Checks, check)
+			}
+		}
+	}
+
+	if cfg.Transports.LoadBalancing.Enabled {
 		service.Tags = append(service.Tags, "lb")
-	}
-
-	if Version != "" {
-		service.Tags = append(service.Tags, Version)
 	}
 
 	ticker := time.NewTicker(30 * time.Second)
@@ -358,6 +426,7 @@ func Discovery(ctx context.Context, ch chan<- identity.Instance, cfg *conf.Confi
 		log.Error(err.Error(), zap.String("phase", "create_session"))
 		return
 	}
+	defer client.Session().Destroy(session, nil)
 
 	query, _, err := client.PreparedQuery().Create(&consul.PreparedQueryDefinition{
 		Session: session,

@@ -9,6 +9,14 @@ import (
 	"github.com/mirror520/identity/user"
 )
 
+type EndpointSet struct {
+	Register         endpoint.Endpoint
+	SignIn           endpoint.Endpoint
+	OTPVerify        endpoint.Endpoint
+	AddSocialAccount endpoint.Endpoint
+	CheckHealth      endpoint.Endpoint
+}
+
 type RegisterRequest struct {
 	Username string
 	Name     string
@@ -92,6 +100,18 @@ func AddSocialAccountEndpoint(svc Service) endpoint.Endpoint {
 		}
 
 		return u, nil
+	}
+}
+
+type RequestInfo struct {
+	ClientIP  string `json:"client_ip"`
+	UserAgent string `json:"user_agent"`
+}
+
+func CheckHealth(svc Service) endpoint.Endpoint {
+	return func(ctx context.Context, request any) (response any, err error) {
+		err = svc.CheckHealth(ctx)
+		return
 	}
 }
 

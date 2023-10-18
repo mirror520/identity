@@ -14,7 +14,7 @@ import (
 type natsTestSuite struct {
 	suite.Suite
 	cfg    conf.EventBus
-	pubSub pubsub.PubSub
+	pubSub NATSPubSub
 }
 
 func (suite *natsTestSuite) SetupSuite() {
@@ -23,7 +23,10 @@ func (suite *natsTestSuite) SetupSuite() {
 		path = "../.."
 	}
 
-	cfg, err := conf.LoadConfig(path)
+	conf.Path = path
+	conf.Port = 8080
+
+	cfg, err := conf.LoadConfig()
 	if err != nil {
 		suite.Fail(err.Error())
 		return
@@ -47,16 +50,14 @@ func (suite *natsTestSuite) SetupSuite() {
 		},
 	}
 
-	pubSub, err := NewPubSub(cfg.EventBus)
+	pubSub, err := NewNATSPubSub(cfg.Transports.NATS.Internal)
 	if err != nil {
 		suite.Fail(err.Error())
 		return
 	}
 
-	pullBasedPubSub, _ := pubSub.PullBasedPubSub()
-
 	stream := cfg.EventBus.Users.Stream
-	if err := pullBasedPubSub.AddStream(stream.Name, stream.Config); err != nil {
+	if err := pubSub.AddStream(stream.Name, stream.Config); err != nil {
 		suite.Fail(err.Error())
 		return
 	}
@@ -68,7 +69,7 @@ func (suite *natsTestSuite) SetupSuite() {
 func (suite *natsTestSuite) TestPublishAndSubscribe() {
 	data := make(chan string, 1)
 
-	err := suite.pubSub.Subscribe("tests.>", func(ctx context.Context, msg *pubsub.Message) error {
+	err := suite.pubSub.Subscribe("tests.#", func(ctx context.Context, msg *pubsub.Message) error {
 		data <- string(msg.Data)
 		return nil
 	})
@@ -84,17 +85,15 @@ func (suite *natsTestSuite) TestPublishAndSubscribe() {
 }
 
 func (suite *natsTestSuite) TestPullSubscribe() {
-	pullBasedPubSub, _ := suite.pubSub.PullBasedPubSub()
-
 	stream := suite.cfg.Users.Stream
 	consumer := suite.cfg.Users.Consumer
-	if err := pullBasedPubSub.AddConsumer(consumer.Name, stream.Name, consumer.Config); err != nil {
+	if err := suite.pubSub.AddConsumer(consumer.Name, stream.Name, consumer.Config); err != nil {
 		suite.Fail(err.Error())
 		return
 	}
 
 	data := make(chan string, 1)
-	if err := pullBasedPubSub.PullSubscribe(consumer.Name, stream.Name, func(ctx context.Context, msg *pubsub.Message) error {
+	if err := suite.pubSub.PullSubscribe(consumer.Name, stream.Name, func(ctx context.Context, msg *pubsub.Message) error {
 		data <- string(msg.Data)
 		return nil
 	}); err != nil {

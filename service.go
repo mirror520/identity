@@ -24,6 +24,7 @@ type Service interface {
 	OTPVerify(otp string, id user.UserID) (*user.User, error)
 	SignIn(credential string, provider user.SocialProvider) (*user.User, error)
 	AddSocialAccount(credential string, provider user.SocialProvider, id user.UserID) (*user.User, error)
+	CheckHealth(ctx context.Context) error
 
 	Handler() (EventHandler, error)
 }
@@ -159,6 +160,10 @@ func (svc *service) AddSocialAccount(credential string, provider user.SocialProv
 	defer u.Notify()
 
 	return u, nil
+}
+
+func (svc *service) CheckHealth(ctx context.Context) error {
+	return nil
 }
 
 func (svc *service) UserRegisteredHandler(e *user.UserRegisteredEvent) error {

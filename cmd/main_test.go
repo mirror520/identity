@@ -19,7 +19,10 @@ type identityTestSuite struct {
 }
 
 func (suite *identityTestSuite) SetupSuite() {
-	cfg, err := conf.LoadConfig("..")
+	conf.Path = ".."
+	conf.Port = 8080
+
+	cfg, err := conf.LoadConfig()
 	if err != nil {
 		suite.Fail(err.Error())
 		return

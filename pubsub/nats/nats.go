@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/nats-io/nats.go"
@@ -16,13 +16,28 @@ import (
 	"github.com/mirror520/identity/pubsub"
 )
 
+func init() {
+	pubsub.AddFactory(conf.NATS, NewPubSub)
+}
+
 type ConsumerStream struct {
 	Consumer string
 	Stream   string
 }
 
-func NewPubSub(cfg conf.EventBus) (pubsub.PubSub, error) {
-	url := "nats://" + cfg.Host + ":" + strconv.Itoa(cfg.Port)
+type NATSPubSub interface {
+	pubsub.PubSub
+	AddStream(name string, raw json.RawMessage) error
+	AddConsumer(name string, stream string, raw json.RawMessage) error
+	PullSubscribe(consumer string, stream string, callback pubsub.MessageHandler) error
+}
+
+func NewPubSub(cfg conf.Instance) (pubsub.PubSub, error) {
+	return NewNATSPubSub(cfg)
+}
+
+func NewNATSPubSub(cfg conf.Instance) (NATSPubSub, error) {
+	url := cfg.URL()
 
 	nc, err := nats.Connect(url)
 	if err != nil {
@@ -50,14 +65,6 @@ func NewPubSub(cfg conf.EventBus) (pubsub.PubSub, error) {
 	}, nil
 }
 
-func NewPullBasedPubSub(cfg conf.EventBus) (pubsub.PullBasedPubSub, error) {
-	pubSub, err := NewPubSub(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return pubSub.PullBasedPubSub()
-}
-
 type pubSub struct {
 	log           *zap.Logger
 	nc            *nats.Conn
@@ -74,6 +81,8 @@ func (ps *pubSub) Publish(topic string, data []byte) error {
 }
 
 func (ps *pubSub) Subscribe(topic string, callback pubsub.MessageHandler) error {
+	topic = strings.ReplaceAll(topic, `#`, `>`)
+
 	sub, err := ps.nc.Subscribe(topic, func(m *nats.Msg) {
 		msg := &pubsub.Message{
 			Topic:    m.Subject,
@@ -91,11 +100,6 @@ func (ps *pubSub) Subscribe(topic string, callback pubsub.MessageHandler) error 
 	ps.subscriptions[topic] = sub
 	ps.Unlock()
 	return nil
-}
-
-func (ps *pubSub) PullBasedPubSub() (pubsub.PullBasedPubSub, error) {
-	var pullBasedPubSub pubsub.PullBasedPubSub = ps
-	return pullBasedPubSub, nil
 }
 
 func (ps *pubSub) AddStream(name string, raw json.RawMessage) error {

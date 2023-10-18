@@ -13,7 +13,10 @@ func TestLoadConfig(t *testing.T) {
 
 	os.Setenv("INSTANCE_NAME", "identity")
 
-	cfg, err := LoadConfig("..")
+	Path = ".."
+	Port = 8080
+
+	cfg, err := LoadConfig()
 	if err != nil {
 		assert.Fail(err.Error())
 		return

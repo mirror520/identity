@@ -4,15 +4,38 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"strconv"
 	"time"
 
+	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
 )
 
-func LoadConfig(path string) (*Config, error) {
-	f, err := os.Open(path + "/config.yaml")
+var (
+	Path string
+	Port int
+)
+
+func LoadEnv(cli *cli.Context) error {
+	path := cli.String("path")
+	if path == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+
+		path = homeDir + "/.identity"
+	}
+
+	Path = path
+	Port = cli.Int("port")
+	return nil
+}
+
+func LoadConfig() (*Config, error) {
+	f, err := os.Open(Path + "/config.yaml")
 	if err != nil {
-		f, err = os.Open(path + "/config.example.yaml")
+		f, err = os.Open(Path + "/config.example.yaml")
 		if err != nil {
 			return nil, err
 		}
@@ -26,32 +49,18 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
-	// TODO
-	if cfg.Persistence.Host == "" {
-		cfg.Persistence.Host = path
-	}
-
 	return cfg, nil
 }
 
 type Config struct {
-	Name          string         `yaml:"name"`
-	Address       string         `yaml:"address"`
-	Port          int            `yaml:"-"`
-	ExternalProxy *ExternalProxy `yaml:"external"`
-	BaseURL       string         `yaml:"baseUrl"`
-	JWT           JWT            `yaml:"jwt"`
-	Transport     Transport      `yaml:"transport"`
-	Persistence   Persistence    `yaml:"persistence"`
-	EventBus      EventBus       `yaml:"eventBus"`
-	Providers     Providers      `yaml:"providers"`
-	Test          Test           `yaml:"test"`
-}
-
-type ExternalProxy struct {
-	Scheme  string `yaml:"scheme"`
-	Address string `yaml:"address"`
-	Port    int    `yaml:"port"`
+	Name        string      `yaml:"name"`
+	BaseURL     string      `yaml:"baseUrl"`
+	JWT         JWT         `yaml:"jwt"`
+	Transports  Transports  `yaml:"transports"`
+	Persistence Persistence `yaml:"persistence"`
+	EventBus    EventBus    `yaml:"eventBus"`
+	Providers   Providers   `yaml:"providers"`
+	Test        Test        `yaml:"test"`
 }
 
 type JWT struct {
@@ -110,14 +119,74 @@ func (cfg *JWT) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-type Transport struct {
-	NATS struct {
-		Enabled   bool   `yaml:"enabled"`
-		ReqPrefix string `yaml:"reqPrefix"`
-	} `yaml:"nats"`
-	LoadBalancing struct {
-		Enabled bool `yaml:"enabled"`
-	} `yaml:"loadBalancing"`
+type Transports struct {
+	HTTP          RegisterHTTP  `yaml:"http"`
+	NATS          RegisterNATS  `yaml:"nats"`
+	LoadBalancing LoadBalancing `yaml:"loadBalancing"`
+}
+
+type RegisterHTTP struct {
+	Enabled  bool
+	Internal Instance
+	External *Instance
+}
+
+func (r *RegisterHTTP) UnmarshalYAML(value *yaml.Node) error {
+	var raw struct {
+		Enabled  bool      `yaml:"enabled"`
+		Internal Instance  `yaml:"internal"`
+		External *Instance `yaml:"external"`
+	}
+
+	if err := value.Decode(&raw); err != nil {
+		return err
+	}
+
+	r.Enabled = raw.Enabled
+	r.Internal = raw.Internal
+	r.External = raw.External
+
+	// default
+	if r.Internal.Scheme == "" {
+		r.Internal.Scheme = "http"
+	}
+
+	if r.Internal.Host == "" {
+		r.Internal.Host = "localhost"
+	}
+
+	if r.Internal.Port == 0 {
+		r.Internal.Port = Port
+	}
+
+	return nil
+}
+
+type RegisterNATS struct {
+	Enabled   bool      `yaml:"enabled"`
+	Internal  Instance  `yaml:"internal"`
+	External  *Instance `yaml:"external"`
+	ReqPrefix string    `yaml:"reqPrefix"`
+}
+
+type LoadBalancing struct {
+	Enabled bool `yaml:"enabled"`
+}
+
+type Instance struct {
+	Scheme string `yaml:"scheme"`
+	Host   string `yaml:"host"`
+	Port   int    `yaml:"port"`
+	Health Health `yaml:"health"`
+}
+
+func (i *Instance) URL() string {
+	return i.Scheme + "://" + i.Host + ":" + strconv.Itoa(i.Port)
+}
+
+type Health struct {
+	Enabled bool   `yaml:"enabled"`
+	Path    string `yaml:"path"`
 }
 
 type PersistenceDriver int
@@ -186,7 +255,12 @@ func (p *Persistence) UnmarshalYAML(value *yaml.Node) error {
 
 	p.Driver = driver
 	p.Name = raw.Name
+
 	p.Host = raw.Host
+	if raw.Host == "" {
+		p.Host = Path
+	}
+
 	p.Port = raw.Port
 	p.Username = raw.Username
 	p.Password = raw.Password
@@ -219,16 +293,12 @@ func (p TransportProvider) String() string {
 
 type EventBus struct {
 	Provider TransportProvider
-	Host     string
-	Port     int
 	Users    Users
 }
 
 func (e *EventBus) UnmarshalYAML(value *yaml.Node) error {
 	var raw struct {
 		Provider string `yaml:"provider"`
-		Host     string `yaml:"host"`
-		Port     int    `yaml:"port"`
 		Users    Users  `yaml:"users"`
 	}
 
@@ -242,8 +312,6 @@ func (e *EventBus) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	e.Provider = provider
-	e.Host = raw.Host
-	e.Port = raw.Port
 	e.Users = raw.Users
 
 	return nil

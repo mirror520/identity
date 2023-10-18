@@ -89,3 +89,20 @@ func SignInHandler(endpoint endpoint.Endpoint) pubsub.MessageHandler {
 		return msg.Response(bs)
 	}
 }
+
+func CheckHealthHandler(endpoint endpoint.Endpoint) pubsub.MessageHandler {
+	return func(_ context.Context, msg *pubsub.Message) error {
+		var info *identity.RequestInfo
+		if err := json.Unmarshal(msg.Data, &info); err != nil {
+			return err
+		}
+
+		ctx := context.WithValue(context.Background(), model.REQUEST_INFO, info)
+		_, err := endpoint(ctx, nil)
+		if err != nil {
+			return msg.Response([]byte(err.Error()))
+		}
+
+		return msg.Response([]byte(`ok`))
+	}
+}

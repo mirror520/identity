@@ -1,8 +1,11 @@
 package identity
 
 import (
+	"context"
+
 	"go.uber.org/zap"
 
+	"github.com/mirror520/identity/model"
 	"github.com/mirror520/identity/user"
 )
 
@@ -90,6 +93,26 @@ func (mw *loggingMiddleware) AddSocialAccount(credential string, provider user.S
 		zap.String("username", u.Username),
 	)
 	return u, nil
+}
+
+func (mw *loggingMiddleware) CheckHealth(ctx context.Context) error {
+	log := mw.log.With(
+		zap.String("action", "check_health"),
+	)
+
+	if info, ok := ctx.Value(model.REQUEST_INFO).(*RequestInfo); ok {
+		log = log.With(zap.String("remote", info.ClientIP))
+		log = log.With(zap.String("user-agent", info.UserAgent))
+	}
+
+	err := mw.next.CheckHealth(ctx)
+	if err != nil {
+		log.Error(err.Error())
+		return err
+	}
+
+	log.Info("ok")
+	return nil
 }
 
 func (mw *loggingMiddleware) Handler() (EventHandler, error) {

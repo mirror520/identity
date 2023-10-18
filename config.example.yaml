@@ -1,10 +1,5 @@
 name: $INSTANCE_NAME
 
-# external:
-#   scheme: http
-#   address: identity.mirror520.svc.cluster.local
-#   port: 80
-
 baseUrl: identity.linyc.idv.tw
 
 jwt:
@@ -14,9 +9,33 @@ jwt:
     enabled: true
     maximum: 1h30m
 
-transport:
+transports:
+  http:
+    enabled: true
+    internal:
+      # scheme: http
+      # host: identity.mirror520.svc.cluster.local
+      # port: 80
+      health: 
+        enabled: true
+        path: /health
+    # external:
+    #   scheme: https
+    #   host: identity.linyc.idv.tw
+    #   port: 443
   nats:
     enabled: true
+    internal:
+      scheme: nats
+      host: nats
+      port: 4222
+    health:
+      enabled: true
+      path: identity.$INSTANCE_NAME.health
+    external:
+      scheme: nats
+      host: nats.linyc.idv.tw
+      port: 4222
     reqPrefix: identity.$INSTANCE_NAME
   loadBalancing:
     enabled: false
@@ -27,8 +46,6 @@ persistence:
 
 eventBus:
   provider: nats
-  host: nats
-  port: 4222
   users:
     stream:
       name: USERS

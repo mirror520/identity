@@ -2,22 +2,16 @@ package pubsub
 
 import (
 	"context"
-	"encoding/json"
 )
+
+// topic wildcards:
+// * (star) can substitute for exactly one word.
+// # (hash) can substitute for zero or more words.
 
 type PubSub interface {
 	Publish(topic string, data []byte) error
 	Subscribe(topic string, callback MessageHandler) error
 	Close() error
-
-	PullBasedPubSub() (PullBasedPubSub, error)
-}
-
-type PullBasedPubSub interface {
-	PubSub
-	AddStream(name string, raw json.RawMessage) error
-	AddConsumer(name string, stream string, raw json.RawMessage) error
-	PullSubscribe(consumer string, stream string, callback MessageHandler) error
 }
 
 type MessageHandler func(ctx context.Context, msg *Message) error
