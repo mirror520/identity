@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -25,6 +26,7 @@ import (
 	"github.com/mirror520/identity/events"
 	"github.com/mirror520/identity/model"
 	"github.com/mirror520/identity/persistence"
+	"github.com/mirror520/identity/policy"
 	"github.com/mirror520/identity/pubsub"
 	"github.com/mirror520/identity/pubsub/nats"
 	"github.com/mirror520/identity/transport"
@@ -106,6 +108,7 @@ func run(cli *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	conf.ReplaceGlobals(cfg)
 
 	log, err := zap.NewDevelopment()
 	if err != nil {
@@ -200,6 +203,11 @@ func run(cli *cli.Context) error {
 
 	events.ReplaceGlobals(pubSub)
 
+	policy, err := policy.NewRegoPolicy(ctx, conf.Path)
+	if err != nil {
+		return err
+	}
+
 	if nats := cfg.Transports.NATS; nats.Enabled {
 		// SUB identity.signin and identity.$INSTANCE.signin
 		signInHandler := transPubSub.SignInHandler(endpoints.SignIn)
@@ -217,18 +225,18 @@ func run(cli *cli.Context) error {
 	r.Use(gin.Recovery())
 	r.Use(cors.Default())
 
+	auth := transHTTP.Authorizator(policy)
+
+	r.GET("/hello", auth("identity::hello.view"), func(ctx *gin.Context) {
+		ctx.String(http.StatusOK, "Hello World\n")
+	})
+
 	r.GET("/health", transHTTP.CheckHealthHandler(endpoints.CheckHealth))
 
 	apiV1 := r.Group("/identity/v1")
 	{
-		authenticator := transHTTP.SignInAuthenticator(endpoints.SignIn)
-		authMiddleware, err := transHTTP.AuthMiddlware(authenticator, *cfg)
-		if err != nil {
-			return err
-		}
-
 		// PATCH /signin
-		apiV1.PATCH("/signin", authMiddleware.LoginHandler)
+		apiV1.PATCH("/signin", transHTTP.SignInHandler(endpoints.SignIn))
 
 		// POST /users
 		apiV1.POST("/users", transHTTP.RegisterHandler(endpoints.Register))
@@ -238,6 +246,9 @@ func run(cli *cli.Context) error {
 
 		// PUT /users/id/socials
 		apiV1.POST("/users/:id/socials", transHTTP.AddSocialAccountHandler(endpoints.AddSocialAccount))
+
+		// PATCH /token/refresh
+		apiV1.PATCH("/token/refresh", transHTTP.RefreshHandler)
 	}
 
 	go r.Run(":" + strconv.Itoa(conf.Port))

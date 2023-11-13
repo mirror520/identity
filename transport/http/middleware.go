@@ -3,94 +3,87 @@ package http
 import (
 	"errors"
 	"net/http"
-	"time"
+	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
-
-	jwt "github.com/appleboy/gin-jwt/v2"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/mirror520/identity/conf"
-	"github.com/mirror520/identity/model"
-	"github.com/mirror520/identity/user"
+	"github.com/mirror520/identity/policy"
 )
 
 var (
-	ErrFailedAuthentication = jwt.ErrFailedAuthentication
+	ErrInvalidToken = errors.New("invalid token")
 )
 
-type Authenticator func(*gin.Context) (any, error)
+var (
+	keyFn jwt.Keyfunc
+	once  sync.Once
+)
 
-func AuthMiddlware(authenticator Authenticator, cfg conf.Config) (*jwt.GinJWTMiddleware, error) {
-	identityKey := "username"
+func KeyFn() jwt.Keyfunc {
+	once.Do(func() {
+		secret := conf.G().JWT.Secret
+		keyFn = func(t *jwt.Token) (interface{}, error) {
+			return secret, nil
+		}
+	})
 
-	mw := &jwt.GinJWTMiddleware{
-		Realm:       cfg.BaseURL,
-		Key:         []byte(cfg.JWT.Secret),
-		Timeout:     cfg.JWT.Timeout,
-		MaxRefresh:  cfg.JWT.Refresh.Maximum,
-		IdentityKey: identityKey,
+	return keyFn
+}
 
-		// 身分驗證處理
-		Authenticator: authenticator,
+type Claims struct {
+	jwt.RegisteredClaims
+	Roles []string `json:"roles"`
+}
 
-		// 附加 JWT Payloads
-		PayloadFunc: func(data any) jwt.MapClaims {
-			if v, ok := data.(*user.User); ok {
-				return jwt.MapClaims{
-					identityKey: v.Username,
-				}
+type GinAuth func(rule string) gin.HandlerFunc
+
+func Authorizator(policy policy.Policy) GinAuth {
+	return func(rule string) gin.HandlerFunc {
+		cfg := conf.G()
+		rules := strings.Split(rule, ".")
+		domain := rules[0]
+		action := rules[1]
+
+		return func(ctx *gin.Context) {
+			tokenStr := ctx.GetHeader("Authorization")
+
+			if !strings.HasPrefix(tokenStr, "Bearer ") {
+				unauthorized(ctx, http.StatusUnauthorized, ErrInvalidToken)
+				return
 			}
-			return jwt.MapClaims{}
-		},
+			tokenStr = strings.TrimPrefix(tokenStr, "Bearer ")
 
-		// 登入成功之回應處理
-		// from mw.LoginHandler
-		LoginResponse: func(ctx *gin.Context, code int, token string, time time.Time) {
-			v, _ := ctx.Get("user")
-			u, ok := v.(*user.User)
-			if !ok {
-				err := errors.New("user not existed or type assert failure")
-				result := model.FailureResult(err)
-				ctx.AbortWithStatusJSON(http.StatusUnauthorized, result)
-			}
-
-			u.Token = user.Token{
-				Token:     token,
-				ExpiredAt: time,
-			}
-
-			result := model.SuccessResult("signin success")
-			result.Data = u
-			ctx.JSON(http.StatusOK, result)
-		},
-
-		// 授權驗證處理
-		Authorizator: func(data interface{}, ctx *gin.Context) bool {
-			// TODO: using OPA (Open Policy Agent)
-			return true
-		},
-
-		// 更新 JWT Token 成功之回應處理
-		// from mw.RefreshHandler
-		RefreshResponse: func(ctx *gin.Context, code int, token string, time time.Time) {
-			newToken := user.Token{
-				Token:     token,
-				ExpiredAt: time,
+			var claims Claims
+			_, err := jwt.ParseWithClaims(tokenStr, &claims, KeyFn(),
+				jwt.WithIssuer(cfg.BaseURL),
+				jwt.WithExpirationRequired(),
+			)
+			if err != nil {
+				unauthorized(ctx, http.StatusUnauthorized, err)
+				return
 			}
 
-			result := model.SuccessResult("refresh token success")
-			result.Data = newToken
-			ctx.JSON(http.StatusOK, result)
-		},
+			input := map[string]any{
+				"domain": domain,
+				"action": action,
+				"roles":  claims.Roles,
+			}
 
-		// 任何未取得授權之錯誤處理
-		// from mw.unauthorized
-		Unauthorized: func(ctx *gin.Context, code int, message string) {
-			err := errors.New(message)
-			result := model.FailureResult(err)
-			ctx.JSON(code, result)
-		},
+			allowed, err := policy.Eval(ctx, input)
+			if err != nil {
+				unauthorized(ctx, http.StatusExpectationFailed, err)
+				return
+			}
+
+			if !allowed {
+				unauthorized(ctx, http.StatusForbidden, errors.New("forbidden"))
+				return
+			}
+
+			ctx.Next()
+		}
 	}
-
-	return jwt.New(mw)
 }

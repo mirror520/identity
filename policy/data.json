@@ -1,0 +1,19 @@
+{
+    "role_permissions": {
+        "admin": [
+            {
+                "domain": "identity::users",
+                "actions": [
+                    "list",
+                    "remove"
+                ]
+            },
+            {
+                "domain": "identity::hello",
+                "actions": [
+                    "view"
+                ]
+            }
+        ]
+    }
+}

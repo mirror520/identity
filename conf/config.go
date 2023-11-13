@@ -14,7 +14,21 @@ import (
 var (
 	Path string
 	Port int
+
+	global *Config
 )
+
+func G() *Config {
+	if global == nil {
+		panic("configuration not loaded")
+	}
+
+	return global
+}
+
+func ReplaceGlobals(cfg *Config) {
+	global = cfg
+}
 
 func LoadEnv(cli *cli.Context) error {
 	path := cli.String("path")
@@ -64,7 +78,7 @@ type Config struct {
 }
 
 type JWT struct {
-	Secret  string
+	Secret  []byte
 	Timeout time.Duration
 	Refresh struct {
 		Enabled bool
@@ -86,7 +100,7 @@ func (cfg *JWT) UnmarshalYAML(value *yaml.Node) error {
 		return err
 	}
 
-	cfg.Secret = raw.Secret
+	cfg.Secret = []byte(raw.Secret)
 
 	if raw.Timeout == "" {
 		cfg.Timeout = 1 * time.Hour
