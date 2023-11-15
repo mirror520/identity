@@ -5,6 +5,7 @@
                 "domain": "identity::users",
                 "actions": [
                     "list",
+                    "update",
                     "remove"
                 ]
             },
@@ -14,6 +15,21 @@
                     "view"
                 ]
             }
+        ],
+        "user": [
+            {
+                "domain": "identity::users",
+                "actions": [
+                    "update"
+                ]
+            }
         ]
+    },
+    "who_enum": {
+        "owner": 1,
+        "group": 2,
+        "others": 4,
+        "admin": 8,
+        "all": 16
     }
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -47,12 +46,14 @@ func OTPVerifyHandler(endpoint endpoint.Endpoint) gin.HandlerFunc {
 			err := errors.New("id not found")
 			result := model.FailureResult(err)
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, result)
+			return
 		}
 
 		userID, err := user.ParseID(id)
 		if err != nil {
 			result := model.FailureResult(err)
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, result)
+			return
 		}
 
 		var req identity.OTPVerifyRequest
@@ -105,7 +106,8 @@ func SignInHandler(endpoint endpoint.Endpoint) gin.HandlerFunc {
 		claims := Claims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				Issuer:    cfg.BaseURL,
-				Subject:   u.Username,
+				Subject:   u.ID.String(),
+				Audience:  jwt.ClaimStrings{u.Username},
 				ExpiresAt: jwt.NewNumericDate(now.Add(cfg.JWT.Timeout)),
 				IssuedAt:  jwt.NewNumericDate(now),
 				ID:        ulid.Make().String(),
@@ -113,7 +115,7 @@ func SignInHandler(endpoint endpoint.Endpoint) gin.HandlerFunc {
 			Roles: []string{"admin"},
 		}
 
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, &claims)
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 		tokenStr, err := token.SignedString(cfg.JWT.Secret)
 		if err != nil {
 			unauthorized(ctx, http.StatusExpectationFailed, err)
@@ -147,27 +149,15 @@ func RefreshHandler(ctx *gin.Context) {
 		return
 	}
 
-	tokenStr := ctx.GetHeader("Authorization")
-
-	if !strings.HasPrefix(tokenStr, "Bearer ") {
-		unauthorized(ctx, http.StatusUnauthorized, ErrInvalidToken)
-		return
-	}
-	tokenStr = strings.TrimPrefix(tokenStr, "Bearer ")
-
 	var claims Claims
-	_, err := jwt.ParseWithClaims(tokenStr, &claims, KeyFn(),
-		jwt.WithIssuer(cfg.BaseURL),
-		jwt.WithExpirationRequired(),
-	)
-	if err != nil {
+	if err := ParseToken(ctx, &claims); err != nil {
 		unauthorized(ctx, http.StatusUnauthorized, err)
 		return
 	}
 
 	if time.Since(claims.IssuedAt.Time) > cfg.JWT.Refresh.Maximum {
 		err := errors.New("token beyond refresh time")
-		unauthorized(ctx, http.StatusUnauthorized, err)
+		unauthorized(ctx, http.StatusForbidden, err)
 		return
 	}
 
@@ -176,8 +166,8 @@ func RefreshHandler(ctx *gin.Context) {
 	claims.IssuedAt = jwt.NewNumericDate(now)
 	claims.ID = ulid.Make().String()
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &claims)
-	tokenStr, err = token.SignedString(cfg.JWT.Secret)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenStr, err := token.SignedString(cfg.JWT.Secret)
 	if err != nil {
 		unauthorized(ctx, http.StatusExpectationFailed, err)
 		return

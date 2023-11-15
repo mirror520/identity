@@ -4,72 +4,64 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/mirror520/identity/conf"
 	"github.com/mirror520/identity/policy"
 )
-
-var (
-	ErrInvalidToken = errors.New("invalid token")
-)
-
-var (
-	keyFn jwt.Keyfunc
-	once  sync.Once
-)
-
-func KeyFn() jwt.Keyfunc {
-	once.Do(func() {
-		secret := conf.G().JWT.Secret
-		keyFn = func(t *jwt.Token) (interface{}, error) {
-			return secret, nil
-		}
-	})
-
-	return keyFn
-}
 
 type Claims struct {
 	jwt.RegisteredClaims
 	Roles []string `json:"roles"`
 }
 
-type GinAuth func(rule string) gin.HandlerFunc
+func (c *Claims) Map() map[string]any {
+	return map[string]any{
+		"sub":   c.Subject,
+		"roles": c.Roles,
+	}
+}
+
+type Who byte
+
+const (
+	Owner Who = 1 << iota
+	Group
+	Others
+	Admin
+	All
+)
+
+type GinAuth func(rule string, who ...Who) gin.HandlerFunc
 
 func Authorizator(policy policy.Policy) GinAuth {
-	return func(rule string) gin.HandlerFunc {
-		cfg := conf.G()
+	return func(rule string, who ...Who) gin.HandlerFunc {
 		rules := strings.Split(rule, ".")
 		domain := rules[0]
 		action := rules[1]
 
+		var flags byte
+		for _, w := range who {
+			flags = flags | byte(w)
+		}
+
 		return func(ctx *gin.Context) {
-			tokenStr := ctx.GetHeader("Authorization")
-
-			if !strings.HasPrefix(tokenStr, "Bearer ") {
-				unauthorized(ctx, http.StatusUnauthorized, ErrInvalidToken)
-				return
-			}
-			tokenStr = strings.TrimPrefix(tokenStr, "Bearer ")
-
 			var claims Claims
-			_, err := jwt.ParseWithClaims(tokenStr, &claims, KeyFn(),
-				jwt.WithIssuer(cfg.BaseURL),
-				jwt.WithExpirationRequired(),
-			)
-			if err != nil {
+			if err := ParseToken(ctx, &claims); err != nil {
 				unauthorized(ctx, http.StatusUnauthorized, err)
 				return
 			}
 
 			input := map[string]any{
-				"domain": domain,
-				"action": action,
-				"roles":  claims.Roles,
+				"domain":    domain,
+				"action":    action,
+				"who_flags": flags,
+				"claims":    claims.Map(),
+			}
+
+			if id := ctx.Param("id"); id != "" {
+				input["object"] = id
 			}
 
 			allowed, err := policy.Eval(ctx, input)

@@ -231,6 +231,13 @@ func run(cli *cli.Context) error {
 		ctx.String(http.StatusOK, "Hello World\n")
 	})
 
+	r.GET("/hello/:id/:name",
+		auth("identity::hello.view", transHTTP.Owner),
+		func(ctx *gin.Context) {
+			ctx.String(http.StatusOK, "Hello %s\n", ctx.Param("name"))
+		},
+	)
+
 	r.GET("/health", transHTTP.CheckHealthHandler(endpoints.CheckHealth))
 
 	apiV1 := r.Group("/identity/v1")
@@ -242,10 +249,16 @@ func run(cli *cli.Context) error {
 		apiV1.POST("/users", transHTTP.RegisterHandler(endpoints.Register))
 
 		// PATCH /users/:id/verify
-		apiV1.POST("/users/:id/verify", transHTTP.OTPVerifyHandler(endpoints.OTPVerify))
+		apiV1.POST("/users/:id/verify",
+			auth("identity::users.update", transHTTP.Owner),
+			transHTTP.OTPVerifyHandler(endpoints.OTPVerify),
+		)
 
 		// PUT /users/id/socials
-		apiV1.POST("/users/:id/socials", transHTTP.AddSocialAccountHandler(endpoints.AddSocialAccount))
+		apiV1.POST("/users/:id/socials",
+			auth("identity::users.update", transHTTP.Owner|transHTTP.Admin),
+			transHTTP.AddSocialAccountHandler(endpoints.AddSocialAccount),
+		)
 
 		// PATCH /token/refresh
 		apiV1.PATCH("/token/refresh", transHTTP.RefreshHandler)

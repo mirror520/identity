@@ -3,6 +3,7 @@ package user
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -24,6 +25,61 @@ const (
 	Locked
 	Revoked
 )
+
+func ParseStatus(status string) (Status, error) {
+	status = strings.ToLower(status)
+	switch status {
+	case "pending":
+		return Pending, nil
+	case "registered":
+		return Registered, nil
+	case "activated":
+		return Activated, nil
+	case "locked":
+		return Locked, nil
+	case "revoked":
+		return Revoked, nil
+	default:
+		return -1, errors.New("invalid status")
+	}
+}
+
+func (s Status) String() string {
+	switch s {
+	case Pending:
+		return "pending"
+	case Registered:
+		return "registered"
+	case Activated:
+		return "activated"
+	case Locked:
+		return "locked"
+	case Revoked:
+		return "revoked"
+	default:
+		return "unknown"
+	}
+}
+
+func (s *Status) MarshalJSON() ([]byte, error) {
+	jsonStr := `"` + s.String() + `"`
+	return []byte(jsonStr), nil
+}
+
+func (s *Status) UnmarshalJSON(data []byte) error {
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	status, err := ParseStatus(raw)
+	if err != nil {
+		return err
+	}
+
+	*s = status
+	return nil
+}
 
 type UserID ulid.ULID // AggregateRoot
 
