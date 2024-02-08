@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
@@ -223,7 +222,6 @@ func run(cli *cli.Context) error {
 	r := gin.New()
 	r.Use(ginzap.Ginzap(log, time.RFC3339, true))
 	r.Use(gin.Recovery())
-	r.Use(cors.Default())
 
 	auth := transHTTP.Authorizator(policy)
 
