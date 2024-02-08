@@ -13,7 +13,7 @@ trigger:
 
 steps:
 - name: build
-  image: golang:1.19
+  image: golang:1.21
   volumes:
   - name: deps
     path: /go
@@ -22,7 +22,7 @@ steps:
   - go build cmd/main.go
 
 - name: test
-  image: golang:1.19
+  image: golang:1.21
   volumes:
   - name: deps
     path: /go
@@ -54,7 +54,7 @@ trigger:
 
 steps:
 - name: build
-  image: golang:1.19-alpine3.17
+  image: golang:1.21-alpine
   commands:
   - apk add gcc musl-dev
   - go build -ldflags "-X main.Version=${DRONE_TAG}
@@ -89,7 +89,7 @@ trigger:
 
 steps:
 - name: build
-  image: golang:1.19-alpine3.17
+  image: golang:1.21-alpine
   commands:
   - apk add gcc musl-dev
   - go build -ldflags "-X main.Version=${DRONE_TAG}

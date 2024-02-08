@@ -1,4 +1,4 @@
-FROM alpine:3.17
+FROM alpine:3.19
 EXPOSE 8080
 ADD release/linux/amd64/identity /bin/
 ADD config.example.yaml /root/.identity/
